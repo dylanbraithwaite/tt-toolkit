@@ -1,3 +1,9 @@
 [workspace]
 
-members = ["tt-toolkit"]
+#edition = "2024"
+resolver = "3"
+members = ["tt-toolkit", "tt-toolkit_derive"]
+
+[patch.crates-io]
+tt-toolkit = { path = "tt-toolkit" }
+tt-toolkit_derive = { path = "tt-toolkit_derive" }
