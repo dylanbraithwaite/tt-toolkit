@@ -7,12 +7,6 @@ use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::attributes::*;
 
-fn field_is_metadata(binding: &BindingInfo) -> bool {
-    binding.has_attribute(METADATA_ATTR)
-        || binding.has_attribute(VAR_NAME_ATTR)
-        || binding.has_attribute(BINDING_NAME_ATTR)
-}
-
 fn ensure_can_be_debruijn_var(binding: &BindingInfo) {
     let attr = binding.find_attribute(DEBRUIJN_VAR_ATTR).unwrap();
     let binding_ty = &binding.ast().ty;
@@ -46,7 +40,7 @@ fn map_indices_impl(mut ast: Structure) -> TokenStream {
             }
         };
 
-        if field_is_metadata(binding) {
+        if binding.is_metadata() {
             // This field is metadata (such as the string representation of a variable)
             // so we leave it untouched.
             binding.to_token_stream()
