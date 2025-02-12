@@ -1,6 +1,6 @@
 [package]
 name = "tt-toolkit_derive"
-version = "0.1.0"
+version = "1.0.0-dev"
 edition = "2024"
 
 [lib]
@@ -16,4 +16,4 @@ proc-macro-error = "1.0.4"
 spez = "0.1.2"
 
 [dev-dependencies]
-tt-toolkit = "*"
+tt-toolkit = "1.0.0-dev"

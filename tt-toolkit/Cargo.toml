@@ -1,11 +1,11 @@
 [package]
 name = "tt-toolkit"
-version = "0.1.0"
+version = "1.0.0-dev"
 edition = "2024"
 
 [lib]
 name = "ttt"
 
 [dependencies]
-tt-toolkit_derive = "*"
+tt-toolkit_derive = "1.0.0-dev"
 thiserror = "2.0.11"

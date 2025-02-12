@@ -109,7 +109,7 @@ dependencies = [
 
 [[package]]
 name = "tt-toolkit"
-version = "0.1.0"
+version = "1.0.0-dev"
 dependencies = [
  "thiserror",
  "tt-toolkit_derive",
@@ -117,7 +117,7 @@ dependencies = [
 
 [[package]]
 name = "tt-toolkit_derive"
-version = "0.1.0"
+version = "1.0.0-dev"
 dependencies = [
  "proc-macro-error",
  "proc-macro2",
