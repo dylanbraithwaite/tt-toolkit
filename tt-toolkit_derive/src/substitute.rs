@@ -19,11 +19,11 @@ struct SubstDerive<'a> {
 }
 
 impl<'a> SubstDerive<'a> {
-    fn is_self_subst(&self) -> bool {
-        // todo: Better way to compare types?
-        self.ty == parse_quote!(Self)
-            || self.ty == type_ident(self.ast.ast().ident.clone())
-    }
+    // fn is_self_subst(&self) -> bool {
+    //     // todo: Better way to compare types?
+    //     self.ty == parse_quote!(Self)
+    //         || self.ty == type_ident(self.ast.ast().ident.clone())
+    // }
 
     fn ast_is_var_wrapper(&self) -> bool {
         self.ast.variants().iter().all(|variant| {
@@ -49,9 +49,9 @@ impl<'a> SubstDerive<'a> {
     ) -> TokenStream {
         let greater_than_case = variant.construct_from_bindings(|binding| {
             if *binding == var_field {
-                quote! { #binding - 1 }
+                quote! { *#binding - 1 }
             } else {
-                quote! { #binding }
+                quote! { ::std::clone::Clone::clone(#binding) }
             }
         });
 
@@ -60,29 +60,36 @@ impl<'a> SubstDerive<'a> {
         let equal_case = quote! {{
             let __tmp = spez::spez! {
                 for _ast_param_other;
-                match<T: ::std::convert::Into<#target_ty>> T -> ::std::option::Option<#target_ty> {
+                match<T: ::std::convert::Into<#target_ty> + Clone> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::Some(
-                        ::std::convert::Into::into(_ast_param_other)
-                    )
+                    ::std::convert::Into::into(
+                    ::std::clone::Clone::clone(
+                        _ast_param_other
+                    )))
                 }
-                match<T> T -> ::std::option::Option<#target_ty> {
+
+                match<T> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::None
                 }
             };
             match __tmp {
                 ::std::option::Option::Some(__tmp) => __tmp,
-                ::std::option::Option::None => return ::std::result::Result::Err(
-                    ::ttt::SubstError::new::<#subst_ty, #target_ty>()
-                )
+                ::std::option::Option::None =>
+                    return ::std::result::Result::Err(
+                        ::ttt::SubstError::new::<#subst_ty, #target_ty>()
+                    )
             }
         }};
 
-        let less_than_case =
-            variant.construct_from_bindings(|x| x.to_token_stream());
+        let less_than_case = variant.construct_from_bindings(|x| {
+            quote! {
+                ::std::clone::Clone::clone(#x)
+            }
+        });
 
         quote! {{
             ::std::result::Result::Ok(
-                match std::cmp::Ord::cmp(&#var_field, &_ast_param_var) {
+                match std::cmp::Ord::cmp(#var_field, &_ast_param_var) {
                     std::cmp::Ordering::Less => #less_than_case.into(),
                     std::cmp::Ordering::Equal => #equal_case,
                     std::cmp::Ordering::Greater => #greater_than_case.into(),
@@ -102,7 +109,9 @@ impl<'a> SubstDerive<'a> {
                     ::ttt::DeBruijnIndexed::map_indices(#var_field, |index| { index - 1 })
                 }
             } else {
-                quote! { #binding }
+                quote! {
+                    ::std::clone::Clone::clone(#binding)
+                }
             }
         });
 
@@ -111,12 +120,14 @@ impl<'a> SubstDerive<'a> {
         let equal_case = quote! {{
             let __tmp = spez::spez! {
                 for _ast_param_other;
-                match<T: ::std::convert::Into<#target_ty>> T -> ::std::option::Option<#target_ty> {
+                match<T: ::std::convert::Into<#target_ty> + Clone> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::Some(
-                        ::std::convert::Into::into(_ast_param_other)
-                    )
+                    ::std::convert::Into::into(
+                    ::std::clone::Clone::clone(
+                        _ast_param_other
+                    )))
                 }
-                match<T> T -> ::std::option::Option<#target_ty> {
+                match<T> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::None
                 }
             };
@@ -130,12 +141,15 @@ impl<'a> SubstDerive<'a> {
             }
         }};
 
-        let less_than_case =
-            variant.construct_from_bindings(|x| x.to_token_stream());
+        let less_than_case = variant.construct_from_bindings(|binding| {
+            quote! {
+                ::std::clone::Clone::clone(#binding)
+            }
+        });
 
         quote! {
             {
-                let index = ::ttt::DeBruijnIndexed::get_var(&#var_field).unwrap();
+                let index = ::ttt::DeBruijnIndexed::get_var(#var_field).unwrap();
                 ::std::result::Result::Ok(
                     match ::std::cmp::Ord::cmp(&index, &_ast_param_var) {
                         ::std::cmp::Ordering::Less => #less_than_case,
@@ -151,22 +165,22 @@ impl<'a> SubstDerive<'a> {
         let ctor = variant.construct_from_bindings(|binding| {
             let subst_ty = &self.ty;
             if binding.is_metadata() {
-                binding.to_token_stream()
+                quote! {
+                    ::std::clone::Clone::clone(#binding)
+                }
             } else if binding.has_attribute(BINDING_ATTR) {
                 quote_spanned! { binding.ast().span() =>
                     ::ttt::Substitute::<#subst_ty>::substitute(
                         #binding,
-                        ::ttt::DeBruijnIndexed::increment_indices(
-                            ::std::clone::Clone::clone(&_ast_param_other)
-                        ),
-                        _ast_param_var + 1
-                    )?
+                        &::ttt::DeBruijnIndexed::increment_indices(
+                            _ast_param_other),
+                        _ast_param_var + 1)?
                 }
             } else {
                 quote_spanned! { binding.ast().span() =>
                     ::ttt::Substitute::<#subst_ty>::substitute(
                         #binding,
-                        ::std::clone::Clone::clone(&_ast_param_other),
+                        _ast_param_other,
                         _ast_param_var)?
                 }
             }
@@ -211,7 +225,7 @@ impl<'a> ToTokens for SubstDerive<'a> {
                 type Target = #subst_target_type;
                 type Error = ::ttt::SubstError;
 
-                fn substitute(self, _ast_param_other: #subst_type, _ast_param_var: usize) -> Result<Self::Target, Self::Error> {
+                fn substitute(&self, _ast_param_other: &#subst_type, _ast_param_var: usize) -> Result<Self::Target, Self::Error> {
                     #subst_expr_impl
                 }
             }

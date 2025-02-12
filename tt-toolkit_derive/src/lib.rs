@@ -174,13 +174,13 @@ decl_derive! { [Substitute, attributes(var_index, subst_types, variable, binding
     ///
     /// let lambda_expr = LambdaExpr::Lambda( Box::new(LambdaExpr::Unit) );
     ///
-    /// let substituted: Result<LambdaExpr, _> = variable.clone().substitute(lambda_expr.clone(), 0);
+    /// let substituted: Result<LambdaExpr, _> = variable.substitute(&lambda_expr, 0);
     /// assert_eq!(substituted, Ok(lambda_expr.clone()));
     ///
     /// // No substitution occurs because the variables do not match, but
     /// // `variable` is wrapped in a `LambdaExpr::Var(..)` so that it has
     /// // the correct type.
-    /// let substituted2 = variable.clone().substitute(lambda_expr, 1);
+    /// let substituted2 = variable.substitute(&lambda_expr, 1);
     /// assert_eq!(substituted2, Ok(LambdaExpr::Var(variable)));
     /// ```
     #[proc_macro_error]

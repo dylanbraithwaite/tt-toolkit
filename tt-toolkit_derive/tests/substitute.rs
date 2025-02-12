@@ -6,7 +6,7 @@ struct Unit;
 #[test]
 fn unit() {
     let x = Unit;
-    let x = x.substitute(Unit, 0);
+    let x = x.substitute(&Unit, 0);
     assert_eq!(x, Ok(Unit))
 }
 
@@ -17,7 +17,7 @@ struct UnitExplicitSelf;
 #[test]
 fn unit_explicit_self() {
     let x = UnitExplicitSelf;
-    let x = x.substitute(UnitExplicitSelf, 0);
+    let x = x.substitute(&UnitExplicitSelf, 0);
     assert_eq!(x, Ok(UnitExplicitSelf));
 }
 
@@ -28,7 +28,7 @@ struct UnitExplicitOther;
 #[test]
 fn unit_explicit_other() {
     let x = UnitExplicitOther;
-    let x = x.substitute("foo".to_string(), 0);
+    let x = x.substitute(&"foo".to_string(), 0);
     assert_eq!(x, Ok(UnitExplicitOther));
 }
 
@@ -39,10 +39,10 @@ struct UnitExplicitBoth;
 #[test]
 fn unit_explicit_both() {
     let x = UnitExplicitBoth;
-    let x = x.substitute("foo".to_string(), 0);
+    let x = x.substitute(&"foo".to_string(), 0);
     assert_eq!(x, Ok(UnitExplicitBoth));
 
-    let x = x.unwrap().substitute(UnitExplicitBoth, 1);
+    let x = x.unwrap().substitute(&UnitExplicitBoth, 1);
     assert_eq!(x, Ok(UnitExplicitBoth));
 }
 
@@ -67,10 +67,10 @@ fn simple_var_wrapper() {
     let var = SimpleVarWrapper(0);
     let expr = VarOrString::String("foo".to_string());
 
-    let subst1 = var.clone().substitute(expr.clone(), 1);
+    let subst1 = var.substitute(&expr, 1);
     assert_eq!(subst1, Ok(VarOrString::Var(SimpleVarWrapper(0))));
 
-    let subst2 = var.substitute(expr.clone(), 0);
+    let subst2 = var.substitute(&expr, 0);
     assert_eq!(subst2, Ok(expr))
 }
 
@@ -96,10 +96,10 @@ fn recursive_var() {
     let x = Wrap(Box::new(Wrap(Box::new(Var(0)))));
     assert_eq!(x.len(), 2);
 
-    let y = x.clone().substitute(x.clone(), 0).unwrap();
+    let y = x.substitute(&x, 0).unwrap();
     assert_eq!(y.len(), 4);
 
-    let z = y.substitute(x, 2).unwrap();
+    let z = y.substitute(&x, 2).unwrap();
     assert_eq!(z.len(), 4);
 }
 
@@ -149,7 +149,7 @@ fn lambda_expr() {
         name: "baz".to_string(),
     });
 
-    let expr = expr.substitute(var.clone(), 0);
+    let expr = expr.substitute(&var, 0);
     assert_eq!(
         expr,
         Ok(App(

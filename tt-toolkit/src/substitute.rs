@@ -47,8 +47,8 @@ pub trait Substitute<SubstExpr> {
     /// Substitute `expr` into any variables in the expression matching the specified
     /// de Bruijn index.
     fn substitute(
-        self,
-        expr: SubstExpr,
+        &self,
+        expr: &SubstExpr,
         var: usize,
     ) -> Result<Self::Target, Self::Error>;
 }
@@ -61,10 +61,10 @@ where
     type Error = T::Error;
 
     fn substitute(
-        self,
-        expr: U,
+        &self,
+        expr: &U,
         var: usize,
     ) -> Result<Self::Target, Self::Error> {
-        Ok(Box::new((*self).substitute(expr, var)?))
+        Ok(Box::new((**self).substitute(expr, var)?))
     }
 }

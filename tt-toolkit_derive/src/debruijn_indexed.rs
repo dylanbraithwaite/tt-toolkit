@@ -43,15 +43,17 @@ fn map_indices_impl(mut ast: Structure) -> TokenStream {
         if binding.is_metadata() {
             // This field is metadata (such as the string representation of a variable)
             // so we leave it untouched.
-            binding.to_token_stream()
+            quote! {
+                ::std::clone::Clone::clone(#binding)
+            }
         } else if binding.has_attribute(DEBRUIJN_VAR_ATTR) {
             ensure_can_be_debruijn_var(binding);
             // This field is a raw debruijn variable, so we directly modify it with the map function
             quote_spanned! { binding.span() =>
-                if #binding >= #index_var_name {
-                    #func_var_name(#binding)
+                if *#binding >= #index_var_name {
+                    #func_var_name(*#binding)
                 } else {
-                    #binding
+                    *#binding
                 }
             }
         } else if binding.has_attribute(BINDING_ATTR) {
@@ -65,7 +67,7 @@ fn map_indices_impl(mut ast: Structure) -> TokenStream {
     });
 
     quote! {
-        fn map_indices_from<#func_type_name>(self, #index_var_name: usize, #func_var_name: #func_type_name) -> Self
+        fn map_indices_from<#func_type_name>(&self, #index_var_name: usize, #func_var_name: #func_type_name) -> Self
         where
             #func_type_name: Fn(usize) -> usize + Clone
         {
@@ -93,7 +95,9 @@ fn get_var_variant_impl(variant: &VariantInfo) -> TokenStream {
         quote! {
             <#field_ty as ::ttt::DeBruijnIndexed>::get_var(#field)
         }
-    } else if let Some(field) = variant.find_binding_with_attribute(DEBRUIJN_VAR_ATTR) {
+    } else if let Some(field) =
+        variant.find_binding_with_attribute(DEBRUIJN_VAR_ATTR)
+    {
         quote! {
             ::std::option::Option::Some(*#field)
         }
