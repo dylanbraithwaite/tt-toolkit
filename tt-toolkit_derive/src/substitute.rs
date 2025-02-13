@@ -18,7 +18,7 @@ struct SubstDerive<'a> {
     ty: Type,
 }
 
-impl<'a> SubstDerive<'a> {
+impl SubstDerive<'_> {
     // fn is_self_subst(&self) -> bool {
     //     // todo: Better way to compare types?
     //     self.ty == parse_quote!(Self)
@@ -205,7 +205,7 @@ impl<'a> SubstDerive<'a> {
     }
 }
 
-impl<'a> ToTokens for SubstDerive<'a> {
+impl ToTokens for SubstDerive<'_> {
     fn to_tokens(&self, tokens: &mut TokenStream) {
         let subst_expr_impl =
             self.ast.each_variant(|variant| self.variant_impl(variant));

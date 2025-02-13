@@ -1,6 +1,8 @@
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
-use syn::{Attribute, Field, Ident, Type, TypePath, parse::Parse};
+use syn::{
+    Attribute, Expr, Field, Ident, Type, TypePath, parse::Parse, parse_quote,
+};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::attributes::{BINDING_NAME_ATTR, METADATA_ATTR, VAR_NAME_ATTR};
@@ -62,69 +64,32 @@ where
 pub trait ToTokensExt: ToTokens + Sized {
     fn result_ok<Q: Parse>(&self) -> Q {
         syn::parse_quote! {
-            std::result::Result::Ok(#self)
+            ::core::result::Result::Ok(#self)
         }
     }
 
     fn _result_err<Q: Parse>(&self) -> Q {
         syn::parse_quote! {
-            std::result::Result::Err(#self)
+            ::core::result::Result::Err(#self)
         }
     }
 
-    fn cloned(self) -> TokenStream {
+    fn cloned(&self) -> TokenStream {
         quote! {
-            std::clone::Clone::clone(&#self)
+            ::core::clone::Clone::clone(#self)
         }
     }
 
-    fn move_cloned(self) -> TokenStream {
+    fn option_type(&self) -> TokenStream {
         quote! {
-            std::clone::Clone::clone(#self)
+            ::core::option::Option<#self>
         }
     }
 
     fn intoed(&self) -> TokenStream {
-        syn::parse_quote! {
-            std::convert::Into::into(#self)
-        }
-    }
-
-    fn into_named(&self, into_type: impl ToTokens) -> TokenStream {
-        syn::parse_quote! {
-            std::convert::Into::<#into_type>::into(#self)
-        }
-    }
-
-    fn _borrowed(&self) -> TokenStream {
-        syn::parse_quote! {
-            std::borrow::Borrow::borrow(&#self)
-        }
-    }
-
-    fn _dereffed(&self) -> TokenStream {
-        syn::parse_quote! {
-            std::ops::Deref::deref(#self)
-        }
-    }
-
-    fn auto_deref(&self) -> TokenStream {
         quote! {
-            {
-                use ::std::ops::Deref;
-                (&#self).deref()
-            }
+            ::core::convert::Into::into(#self)
         }
-    }
-
-    fn as_refed(&self) -> TokenStream {
-        syn::parse_quote! {
-            std::convert::AsRef::as_ref(&#self)
-        }
-    }
-
-    fn into_if(&self, cond: bool) -> TokenStream {
-        if cond { self.intoed() } else { quote!(#self) }
     }
 }
 
@@ -164,7 +129,7 @@ impl VariantInfoExt for VariantInfo<'_> {
     ) -> TokenStream {
         let bindings = self.bindings();
         self.construct(|_, i| {
-            let binding = bindings.iter().nth(i).unwrap();
+            let binding = bindings.get(i).unwrap();
             f(binding)
         })
     }
@@ -175,8 +140,7 @@ impl VariantInfoExt for VariantInfo<'_> {
     ) -> Option<BindingInfo> {
         self.bindings()
             .iter()
-            .filter(|x| x.has_attribute(attr_name))
-            .next()
+            .find(|x| x.has_attribute(attr_name))
             .cloned()
     }
 }
@@ -201,10 +165,14 @@ pub trait BindingInfoExt {
     fn is_metadata(&self) -> bool;
 }
 
-impl<'a> BindingInfoExt for BindingInfo<'a> {
+impl BindingInfoExt for BindingInfo<'_> {
     fn is_metadata(&self) -> bool {
         self.has_attribute(METADATA_ATTR)
             || self.has_attribute(VAR_NAME_ATTR)
             || self.has_attribute(BINDING_NAME_ATTR)
     }
+}
+
+pub fn option_none() -> Expr {
+    parse_quote!(::core::option::Option::None)
 }

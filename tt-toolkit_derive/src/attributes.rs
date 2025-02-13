@@ -5,3 +5,10 @@ pub const BINDING_NAME_ATTR: &str = "binding_name";
 pub const DEBRUIJN_VAR_ATTR: &str = "var_index";
 pub const VAR_WRAPPER_ATTR: &str = "variable";
 pub const SUBST_TYPES_ATTR: &str = "subst_types";
+
+// Evaluate
+pub const CONTEXT_TYPE_ATTR: &str = "context_type";
+pub const EVAL_TARGET_ATTR: &str = "eval_target";
+pub const EVAL_FUNC_ATTR: &str = "evaluate_with";
+pub const EVAL_PATTERN_ATTR: &str = "evaluate_pattern";
+pub const EVAL_UNWRAP_ATTR: &str = "evaluate_unwrap_variant";

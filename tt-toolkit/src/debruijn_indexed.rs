@@ -38,11 +38,24 @@ impl<T: DeBruijnIndexed> DeBruijnIndexed for Box<T> {
     where
         F: Fn(usize) -> usize + Clone,
     {
-        let foo = (**self).map_indices_from(start, map_fn);
-        Box::new(foo)
+        (**self).map_indices_from(start, map_fn).into()
     }
 
     fn get_var(&self) -> Option<usize> {
         DeBruijnIndexed::get_var(&**self)
+    }
+}
+
+impl<T: DeBruijnIndexed> DeBruijnIndexed for Option<T> {
+    fn map_indices_from<F>(&self, start: usize, map_fn: F) -> Self
+    where
+        F: Fn(usize) -> usize + Clone,
+    {
+        self.as_ref()
+            .map(|expr| expr.map_indices_from(start, map_fn))
+    }
+
+    fn get_var(&self) -> Option<usize> {
+        self.as_ref().and_then(|expr| expr.get_var())
     }
 }
