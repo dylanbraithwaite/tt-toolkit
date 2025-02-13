@@ -1,6 +1,6 @@
 use thiserror::Error;
 
-use crate::{DeBruijnIndexed, PartialContext, SubstError, Context};
+use crate::{PartialContext, SubstError, Context};
 
 #[derive(Debug, Error, PartialEq)]
 pub enum EvalError {
@@ -9,7 +9,7 @@ pub enum EvalError {
 }
 
 pub trait Evaluate: Clone {
-    type Target: DeBruijnIndexed;
+    type Target;
     type Error;
     // type ContextEntry;
     // type Context: Context<Entry = Option<Self::ContextEntry>>;

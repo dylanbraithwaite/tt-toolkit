@@ -132,7 +132,7 @@ where
 {
     let args = args.into_iter();
     quote! {
-        #func_name(#(#args, )*)
+        (#func_name)(#(#args, )*)
     }
 }
 
@@ -141,9 +141,12 @@ fn variant_impl_from_function(
     evaluate_fn: Expr,
 ) -> TokenStream {
     let field_exprs = recursively_evalled_fields(variant);
+    let field_exprs = std::iter::once(context_param().to_token_stream()).chain(field_exprs);
+
     let custom_evalled = function_call(&evaluate_fn, field_exprs);
-    let custom_evalled = quote!(&#custom_evalled);
+    let custom_evalled = quote!(&(#custom_evalled?));
     evaluated(custom_evalled, context_param())
+        .result_ok()
 }
 
 fn variant_impl_from_pattern(
