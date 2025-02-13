@@ -188,7 +188,7 @@ decl_derive! { [Substitute, attributes(var_index, subst_types, variable, binding
 }
 
 mod evaluate;
-decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluate_with, evaluate_pattern, metadata, var_name)] =>
+decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluate_with, evaluate_pattern, metadata, var_name, eval_error_type)] =>
     #[proc_macro_error]
     evaluate::derive
 }

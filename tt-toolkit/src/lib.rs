@@ -7,8 +7,8 @@ pub use substitute::{SubstError, Substitute};
 pub use ttt_derive::Substitute;
 
 pub mod context;
-pub use context::{Context, ListContext};
+pub use context::{Context, ListContext, PartialContext};
 
 pub mod evaluate;
-pub use evaluate::Evaluate;
+pub use evaluate::{Evaluate, EvalError};
 pub use ttt_derive::Evaluate;

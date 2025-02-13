@@ -2,7 +2,7 @@ use proc_macro_error::abort;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    Type, parse_quote, punctuated::Punctuated, spanned::Spanned, token::Comma,
+    Type, punctuated::Punctuated, spanned::Spanned, token::Comma,
 };
 use synstructure::{BindingInfo, Structure, VariantInfo};
 

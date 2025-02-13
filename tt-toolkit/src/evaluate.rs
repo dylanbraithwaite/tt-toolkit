@@ -1,11 +1,19 @@
-use crate::Context;
+use thiserror::Error;
+
+use crate::{DeBruijnIndexed, PartialContext, SubstError, Context};
+
+#[derive(Debug, Error, PartialEq)]
+pub enum EvalError {
+    #[error(transparent)]
+    SubstError(#[from] SubstError),
+}
 
 pub trait Evaluate: Clone {
-    type Target;
+    type Target: DeBruijnIndexed;
     type Error;
     // type ContextEntry;
     // type Context: Context<Entry = Option<Self::ContextEntry>>;
-    type Context: Context<Entry = Option<Self::Target>>;
+    type Context: PartialContext<Self::Target>;
 
     fn evaluate(
         &self,
@@ -22,6 +30,24 @@ pub trait Evaluate: Clone {
         Self::Target: Into<Self>,
     {
         self.evaluate(ctx, under_binders).map(Into::into)
+    }
+
+    fn evaluate_closed(
+        &self, 
+        under_binders: bool
+    ) -> Result<Self::Target, Self::Error> 
+    {
+        self.evaluate(&Self::Context::empty(), under_binders)
+    }
+
+    fn normalise_closed(
+        &self, 
+        under_binders: bool
+    ) -> Result<Self, Self::Error> 
+    where 
+        Self::Target: Into<Self>
+    {
+        self.normalise(&Self::Context::empty(), under_binders)
     }
 
     // It isn't sufficient to ask that Target: From<ContextEntry>, because, for example in the

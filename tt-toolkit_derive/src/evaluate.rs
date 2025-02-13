@@ -214,6 +214,10 @@ pub fn derive(mut ast: Structure) -> TokenStream {
         .parse_attribute(CONTEXT_TYPE_ATTR)
         .unwrap_or_else(|| default_context_type(&eval_type));
 
+    let eval_error_type: Type = ast
+        .parse_attribute(EVAL_ERROR_ATTR)
+        .unwrap_or(parse_quote!(::ttt::EvalError));
+
     let eval_impl = ast.each_variant(evaluate_variant_impl);
     let eval_impl = quote! {
         match self {
@@ -227,17 +231,12 @@ pub fn derive(mut ast: Structure) -> TokenStream {
     ast.gen_impl(quote! {
         gen impl ::ttt::Evaluate for @Self {
             type Target = #eval_type;
-            type Error = ();
-            // type ContextEntry = #eval_type;
+            type Error = #eval_error_type;
             type Context = #context_type;
 
             fn evaluate(&self, #context_name: &Self::Context, #under_binders_name: bool) -> Result<Self::Target, Self::Error> {
                 #eval_impl
             }
-
-            // fn from_context_entry(entry: Self::ContextEntry) -> Self::Target {
-            //     entry
-            // }
         }
     })
 }
