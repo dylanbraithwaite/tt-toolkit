@@ -19,4 +19,4 @@ proc-macro-error = "1.0.4"
 spez = "0.1.2"
 
 [dev-dependencies]
-tt-toolkit = "0.1.0"
+tt-toolkit = "<=0.1.0"
