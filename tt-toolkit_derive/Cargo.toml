@@ -2,6 +2,9 @@
 name = "tt-toolkit_derive"
 version = "0.0.0"
 edition = "2024"
+license = "MIT"
+repository = "https://github.com/dylanbraithwaite/tt-toolkit"
+description = "Derive macros for tt-toolkit"
 
 [lib]
 proc-macro = true
