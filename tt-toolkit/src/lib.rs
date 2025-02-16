@@ -9,6 +9,12 @@ pub use ttt_derive::Substitute;
 pub mod context;
 pub use context::{Context, ListContext, PartialContext};
 
+pub mod contextual_eq;
+pub use contextual_eq::ContextualEq;
+
 pub mod evaluate;
-pub use evaluate::{Evaluate, EvalError};
+pub use evaluate::{EvalError, Evaluate};
 pub use ttt_derive::Evaluate;
+
+pub mod attribute;
+pub use attribute::{BidirAttribute, CheckAttribute, SynthAttribute};
