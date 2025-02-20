@@ -12,7 +12,7 @@ name = "ttt_derive"
 
 [dependencies]
 proc-macro2 = "1"
-syn = { version = "2.0", features = ["full"] }
+syn = { version = "2.0", features = ["full", "fold"] }
 quote = "1.0"
 synstructure = "0.13.1"
 proc-macro-error = "1.0.4"

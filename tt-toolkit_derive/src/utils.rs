@@ -14,6 +14,8 @@ pub trait HasAttributes {
         self.find_attribute(name).is_some()
     }
 
+    fn attribute_position(&self, name: &str) -> Option<usize>;
+
     fn parse_attribute<T>(&self, name: &str) -> Option<T>
     where
         T: Parse,
@@ -27,11 +29,19 @@ impl HasAttributes for [Attribute] {
     fn find_attribute(&self, name: &str) -> Option<Attribute> {
         self.iter().find(|attr| attr.path().is_ident(name)).cloned()
     }
+
+    fn attribute_position(&self, name: &str) -> Option<usize> {
+        self.iter().position(|attr| attr.path().is_ident(name))
+    }
 }
 
 impl HasAttributes for Field {
     fn find_attribute(&self, name: &str) -> Option<Attribute> {
         self.attrs.find_attribute(name)
+    }
+
+    fn attribute_position(&self, name: &str) -> Option<usize> {
+        self.attrs.attribute_position(name)
     }
 }
 
@@ -39,17 +49,29 @@ impl HasAttributes for VariantInfo<'_> {
     fn find_attribute(&self, name: &str) -> Option<Attribute> {
         self.ast().attrs.find_attribute(name)
     }
+
+    fn attribute_position(&self, name: &str) -> Option<usize> {
+        self.ast().attrs.attribute_position(name)
+    }
 }
 
 impl HasAttributes for BindingInfo<'_> {
     fn find_attribute(&self, name: &str) -> Option<Attribute> {
         self.ast().find_attribute(name)
     }
+
+    fn attribute_position(&self, name: &str) -> Option<usize> {
+        self.ast().attribute_position(name)
+    }
 }
 
 impl HasAttributes for Structure<'_> {
     fn find_attribute(&self, name: &str) -> Option<Attribute> {
         self.ast().attrs.find_attribute(name)
+    }
+
+    fn attribute_position(&self, name: &str) -> Option<usize> {
+        self.ast().attrs.attribute_position(name)
     }
 }
 
