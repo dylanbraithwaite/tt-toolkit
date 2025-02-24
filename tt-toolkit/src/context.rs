@@ -7,9 +7,9 @@ pub trait Context<Entry> {
     fn append(&self, variable: Entry) -> Self;
     fn empty() -> Self;
 
-    fn get(&self, var: usize) -> Option<Entry> 
-    where 
-        Entry: DeBruijnIndexed
+    fn get(&self, var: usize) -> Option<Entry>
+    where
+        Entry: DeBruijnIndexed,
     {
         self.iter()
             .nth(var)
@@ -17,10 +17,9 @@ pub trait Context<Entry> {
     }
 }
 
-pub trait PartialContext<Entry> : Context<Option<Entry>> { }
+pub trait PartialContext<Entry>: Context<Option<Entry>> {}
 
 impl<Entry, Ctx> PartialContext<Entry> for Ctx where Ctx: Context<Option<Entry>> {}
-
 
 pub struct ListContext<T>(ConsList<T>);
 

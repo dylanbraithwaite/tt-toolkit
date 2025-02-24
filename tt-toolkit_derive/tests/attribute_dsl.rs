@@ -1,5 +1,5 @@
 use ttt::{ListContext, SynthAttribute};
-use ttt_derive::attr_dsl;
+use ttt_derive::{CheckAttribute, attr_dsl};
 
 #[derive(Clone)]
 enum Ty {
@@ -8,9 +8,16 @@ enum Ty {
     Unit,
 }
 
-#[derive(Clone)]
+#[derive(Clone, CheckAttribute)]
+#[check_type(Ty, context_entry = Ty, context = ListContext<Ty>)]
 enum Expr {
+    #[check(Ty; () : Ty::Unit => true )]
     Unit,
+    #[check(Ty; (src, body) : Ty::Func(src, tgt) =>
+        bind(src) {
+            check(body, tgt)
+        }
+    )]
     Lam(Box<Ty>, Box<Expr>),
     App(Box<Expr>, Box<Expr>),
     Pair(Box<Expr>, Box<Expr>),

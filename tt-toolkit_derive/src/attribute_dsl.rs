@@ -1,4 +1,4 @@
-use proc_macro_error::abort;
+use proc_macro_error2::abort;
 use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::{ToTokens, quote, quote_spanned};
 use syn::parse::{Parse, Parser};
@@ -167,6 +167,7 @@ impl syn::fold::Fold for ExpandBindExpressions {
                 let else_tok = Token![else](span);
                 init.diverge = Some((
                     else_tok,
+                    // TODO: Error handling
                     parse_quote_spanned!(span => { panic!() }),
                 ));
                 // In complex cases we cannot decide whether a pattern is refutable
@@ -184,12 +185,8 @@ impl syn::fold::Fold for ExpandBindExpressions {
 }
 
 mod kw {
-    use syn::custom_keyword;
-
-    custom_keyword!(context);
-    custom_keyword!(attr_type);
-    custom_keyword!(expr_type);
-    custom_keyword!(context_type);
+    syn::custom_keyword!(context);
+    syn::custom_keyword!(context_type);
 }
 
 struct KeyVal<K, V> {

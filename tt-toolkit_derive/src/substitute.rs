@@ -1,9 +1,7 @@
-use proc_macro_error::abort;
+use proc_macro_error2::abort;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
-use syn::{
-    Type, punctuated::Punctuated, spanned::Spanned, token::Comma,
-};
+use syn::{Type, punctuated::Punctuated, spanned::Spanned, token::Comma};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::{

@@ -1,7 +1,7 @@
 mod attributes;
 mod utils;
 
-use proc_macro_error::proc_macro_error;
+use proc_macro_error2::proc_macro_error;
 use synstructure::decl_derive;
 
 mod debruijn_indexed;
@@ -350,4 +350,21 @@ mod attribute_dsl;
 #[proc_macro_error]
 pub fn attr_dsl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     attribute_dsl::attr_dsl(input.into()).into()
+}
+
+mod attribute_derives;
+
+decl_derive! { [CheckAttribute, attributes(check, check_type)] =>
+    #[proc_macro_error]
+    attribute_derives::derive_check
+}
+
+decl_derive! { [SynthAttribute, attributes(synth, synth_type)] =>
+    #[proc_macro_error]
+    attribute_derives::derive_synth
+}
+
+decl_derive! { [BidirAttribute, attributes(check, synth, bidir_type)] =>
+    #[proc_macro_error]
+    attribute_derives::derive_bidir
 }

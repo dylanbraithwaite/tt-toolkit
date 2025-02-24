@@ -8,7 +8,11 @@ use synstructure::{BindingInfo, Structure, VariantInfo};
 use crate::attributes::{BINDING_NAME_ATTR, METADATA_ATTR, VAR_NAME_ATTR};
 
 pub trait HasAttributes {
-    fn find_attribute(&self, name: &str) -> Option<Attribute>;
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute>;
+
+    fn find_attribute(&self, name: &str) -> Option<Attribute> {
+        self.find_all_attributes(name).into_iter().next()
+    }
 
     fn has_attribute(&self, name: &str) -> bool {
         self.find_attribute(name).is_some()
@@ -26,8 +30,11 @@ pub trait HasAttributes {
 }
 
 impl HasAttributes for [Attribute] {
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.iter().find(|attr| attr.path().is_ident(name)).cloned()
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
+        self.iter()
+            .filter(|attr| attr.path().is_ident(name))
+            .cloned()
+            .collect()
     }
 
     fn attribute_position(&self, name: &str) -> Option<usize> {
@@ -36,8 +43,8 @@ impl HasAttributes for [Attribute] {
 }
 
 impl HasAttributes for Field {
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.attrs.find_attribute(name)
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
+        self.attrs.find_all_attributes(name)
     }
 
     fn attribute_position(&self, name: &str) -> Option<usize> {
@@ -46,8 +53,8 @@ impl HasAttributes for Field {
 }
 
 impl HasAttributes for VariantInfo<'_> {
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.ast().attrs.find_attribute(name)
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
+        self.ast().attrs.find_all_attributes(name)
     }
 
     fn attribute_position(&self, name: &str) -> Option<usize> {
@@ -56,8 +63,8 @@ impl HasAttributes for VariantInfo<'_> {
 }
 
 impl HasAttributes for BindingInfo<'_> {
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.ast().find_attribute(name)
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
+        self.ast().find_all_attributes(name)
     }
 
     fn attribute_position(&self, name: &str) -> Option<usize> {
@@ -66,8 +73,8 @@ impl HasAttributes for BindingInfo<'_> {
 }
 
 impl HasAttributes for Structure<'_> {
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.ast().attrs.find_attribute(name)
+    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
+        self.ast().attrs.find_all_attributes(name)
     }
 
     fn attribute_position(&self, name: &str) -> Option<usize> {
