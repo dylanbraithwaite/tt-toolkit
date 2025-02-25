@@ -1,12 +1,12 @@
 use derive_syn_parse::Parse;
 use proc_macro_error2::abort;
 use proc_macro2::{Span, TokenStream};
-use quote::{ToTokens, quote};
+use quote::{quote, quote_spanned, ToTokens};
 use structmeta::StructMeta;
-use syn::{Arm, Attribute, Ident, Pat, Token, Type, parse_quote};
+use syn::{parse_quote, spanned::Spanned, token::Token, Arm, Attribute, Ident, Pat, Token, Type};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
-use crate::utils::HasAttributes;
+use crate::utils::attributes::HasAttributes;
 
 const CHECK_TYPES_ATTR: &str = "check_type";
 const SYNTH_TYPES_ATTR: &str = "synth_type";
@@ -46,22 +46,24 @@ struct CheckArm {
 }
 
 trait DesugarsToMatchArm {
-    fn desugar(&self, context_type: &Type) -> Arm;
+    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm;
 
     fn generate_match(
         &self,
         match_on: impl ToTokens,
         context_type: &Type,
+        attr_type: &Type,
     ) -> TokenStream {
-        let arm = self.desugar(context_type);
+        let arm = self.desugar(context_type, attr_type);
         // TODO: Erorr handling
         let err = quote! {
             panic!()
         };
 
         quote! {
-            match (#match_on) {
+            match #match_on {
                 #arm,
+                #[allow(unreachable_code)]
                 _ => ::std::result::Result::Err(#err),
             }
         }
@@ -71,6 +73,7 @@ trait DesugarsToMatchArm {
 fn instantiate_dsl(
     context_type: &Type,
     context: &Ident,
+    attr_type: &Type,
     body: impl ToTokens,
 ) -> TokenStream {
     quote! {
@@ -78,6 +81,7 @@ fn instantiate_dsl(
         ::ttt_derive::attr_dsl! {
             context_type = #context_type;
             context = #context;
+            attr_type = #attr_type;
             #body
         }
         }
@@ -85,9 +89,9 @@ fn instantiate_dsl(
 }
 
 impl DesugarsToMatchArm for SynthArm {
-    fn desugar(&self, context_type: &Type) -> Arm {
+    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm {
         let pattern = &self.pattern;
-        let body = instantiate_dsl(context_type, &ctx_name(), &self.body);
+        let body = instantiate_dsl(context_type, &ctx_name(), attr_type, &self.body);
         parse_quote! {
             #pattern => #body
         }
@@ -95,10 +99,10 @@ impl DesugarsToMatchArm for SynthArm {
 }
 
 impl DesugarsToMatchArm for CheckArm {
-    fn desugar(&self, context_type: &Type) -> Arm {
+    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm {
         let expr_pat = &self.expr_pat;
         let type_pat = &self.type_pat;
-        let body = instantiate_dsl(context_type, &ctx_name(), &self.body);
+        let body = instantiate_dsl(context_type, &ctx_name(), attr_type, &self.body);
         parse_quote! {
             (#expr_pat, #type_pat) => #body
         }
@@ -196,10 +200,33 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
 
     let check_impl = input.each_variant(|variant| {
         let ctx_name = ctx_name();
+        let attr_val = quote!(__ttt_check_value);
         if let Some(check) = variant.parse_attribute::<CheckBlock>("check") {
-            let bindings = variant.bindings();
-            let bindings = quote!(((#(#bindings),*), __ttt_check_value));
-            check.arm.generate_match(bindings, &instance.context)
+            let bindings = variant
+                .bindings()
+                .iter()
+                // .map(ToTokens::into_token_stream)
+                // .chain(std::iter::once(attr_val))
+                .map(|binding| {
+                    quote_spanned! { binding.span() =>
+                        ::spez::spez! {
+                            for #binding;
+                            match<'a, T: ::core::ops::Deref> &'a T -> &'a T::Target {
+                                ::core::ops::Deref::deref(#binding)
+                            }
+                            match<T> T -> T { 
+                                #binding
+                            }
+                        }
+                    }
+                });
+            let bindings = quote! { 
+                (
+                    ( #(#bindings),* ), 
+                    #attr_val 
+                ) 
+            };
+            check.arm.generate_match(bindings, &instance.context, &instance.attr_type)
         } else if let Some(node) = opt_single_binding(&variant) {
             quote! {
                 #node.check(#ctx_name, __astlib_param_check_type)
@@ -214,15 +241,15 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
 
     input.gen_impl(quote! {
         gen impl ::ttt::CheckAttribute<#attr_type> for @Self {
-            type Context = #context_type;
+            type Ctx = #context_type;
             type Entry = #context_entry;
             type Error = ();
             type Check = bool;
 
             fn check(&self,
-                __ttt_ctx: &#context_type,
-                __ttt_check_value: Self::TypeExpr
-            ) -> ::astlib::TypeCheckResult<Self> {
+                __ttt_check_value: &#attr_type,
+                __ttt_context: &#context_type,
+            ) -> ::core::result::Result<Self::Check, Self::Error> {
                 match self {
                     #check_impl
                 }
@@ -240,6 +267,7 @@ fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
 }
 
 pub fn derive_check(mut input: Structure) -> TokenStream {
+    input.bind_with(|_| synstructure::BindStyle::Move);
     attr_types(&input, CHECK_TYPES_ATTR, "CheckAttribute")
         .into_iter()
         .map(|ty| derive_check_one(&mut input, ty))

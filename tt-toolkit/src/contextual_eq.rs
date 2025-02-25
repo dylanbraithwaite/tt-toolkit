@@ -16,8 +16,10 @@ where
 
 pub trait SyntacticEq: PartialEq {}
 
-impl<Entry, Ctx: Context<Entry>, T: SyntacticEq> ContextualEq<Entry, Ctx>
-    for T
+impl<Entry, Ctx, T> ContextualEq<Entry, Ctx> for T
+where
+    Ctx: Context<Entry>,
+    T: SyntacticEq,
 {
     type Check = bool;
     type Error = std::convert::Infallible;

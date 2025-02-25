@@ -8,7 +8,9 @@ use crate::{
     attributes::{
         BINDING_ATTR, DEBRUIJN_VAR_ATTR, SUBST_TYPES_ATTR, VAR_WRAPPER_ATTR,
     },
-    utils::{BindingInfoExt, HasAttributes, VariantInfoExt, type_ident},
+    attributes::IsMetadata,
+    utils::attributes::HasAttributes,
+    utils::{VariantInfoExt, type_ident},
 };
 
 struct SubstDerive<'a> {

@@ -4,6 +4,7 @@ use syn::{Arm, Expr, Field, Ident, Type, parse_quote};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::{attributes::*, utils::*};
+use crate::utils::attributes::HasAttributes;
 
 fn under_binders_param() -> Ident {
     parse_quote!(__ttt_under_binders)
@@ -131,9 +132,9 @@ where
     Args::Item: ToTokens,
 {
     let args = args.into_iter();
-    quote! {
-        (#func_name)(#(#args, )*)
-    }
+    quote! {{
+        (<#func_name>)(#(#args, )*)
+    }}
 }
 
 fn variant_impl_from_function(

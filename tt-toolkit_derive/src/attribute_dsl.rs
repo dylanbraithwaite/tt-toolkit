@@ -7,7 +7,7 @@ use syn::{
     parse_quote_spanned, spanned::Spanned, token,
 };
 
-use crate::utils::HasAttributes;
+use crate::utils::attributes::HasAttributes;
 
 const WHILE_EXPR_MARKER_ATTR: &str = "ttt_while_is_bind";
 
@@ -46,6 +46,7 @@ fn replace_bind_tokens(input: TokenStream) -> TokenStream {
 struct ExpandBindExpressions {
     context_type: Type,
     context: Expr,
+    attr_type: Type,
 }
 
 impl ExpandBindExpressions {
@@ -63,8 +64,8 @@ impl ExpandBindExpressions {
 
         quote! {
             {
-                let #ctx_name = &#input_ctx;
-                #body
+                let #ctx_name = #input_ctx;
+                ::core::result::Result::Ok(#body)
             }
         }
     }
@@ -77,7 +78,7 @@ impl ExpandBindExpressions {
             1 => {
                 let args = &synth_call.args;
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::synth(&#args, &#ctx_name)?
+                    ::ttt::SynthAttribute::synth(#args, &#ctx_name)?
                 }
             }
             // Allow specifying attribute type as parameter in synth call
@@ -85,7 +86,7 @@ impl ExpandBindExpressions {
                 let attr_ty = synth_call.args.first().unwrap();
                 let expr = synth_call.args.last().unwrap();
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::<#attr_ty>::synth(&#expr, &#ctx_name)?
+                    ::ttt::SynthAttribute::<#attr_ty>::synth(#expr, &#ctx_name)?
                 }
             }
             _ => abort!(
@@ -98,11 +99,16 @@ impl ExpandBindExpressions {
     fn expand_check_expr(&self, check_call: syn::ExprCall) -> Expr {
         let ctx_name = context_name();
         let span = check_call.span();
+        let attr_ty = &self.attr_type;
         match check_call.args.len() {
             2 => {
-                let args = check_call.args.iter();
+                let args = check_call.args;
+                // TODO: I'd like to not have to specify attr_ty here, so that
+                // check(..) calls can check other attribute types too, but
+                // the compiler fails to infer this, I think due to
+                // https://github.com/rust-lang/rust/issues/136856
                 parse_quote_spanned! { span =>
-                    ::ttt::CheckAttribute::check(#(&#args),*, &#ctx_name)?
+                    ::ttt::CheckAttribute::<#attr_ty>::check(#args, #ctx_name)?
                 }
             }
             _ => abort!(span, "`check` call should have exactly 2 parameters"),
@@ -121,13 +127,14 @@ impl ExpandBindExpressions {
         let bindee = &bind_expr.cond;
         let body = &bind_expr.body;
         let context_ty = &self.context_type;
+        // let attr_ty = self
         let context = context_name();
         parse_quote_spanned! { span =>
             #(#attrs)*
             #label
             {
                 let #context =
-                    <#context_ty as ::ttt::Context<_>>::append(&#context, #bindee);
+                    &<#context_ty as ::ttt::Context<_>>::append(&#context, ::core::clone::Clone::clone(#bindee));
                 #body
             }
         }
@@ -187,6 +194,7 @@ impl syn::fold::Fold for ExpandBindExpressions {
 mod kw {
     syn::custom_keyword!(context);
     syn::custom_keyword!(context_type);
+    syn::custom_keyword!(attr_type);
 }
 
 struct KeyVal<K, V> {
@@ -210,6 +218,7 @@ impl<K: Parse, V: Parse> Parse for KeyVal<K, V> {
 struct DslInstantiation {
     context_type: KeyVal<kw::context_type, Type>,
     context: KeyVal<kw::context, Expr>,
+    attr_type: KeyVal<kw::attr_type, Type>,
     body: TokenStream,
 }
 
@@ -218,6 +227,7 @@ impl Parse for DslInstantiation {
         Ok(DslInstantiation {
             context_type: input.parse()?,
             context: input.parse()?,
+            attr_type: input.parse()?,
             body: input.parse()?,
         })
     }
@@ -268,6 +278,7 @@ pub fn attr_dsl(input: TokenStream) -> TokenStream {
     ExpandBindExpressions {
         context_type: instantiation.context_type.val,
         context: instantiation.context.val,
+        attr_type: instantiation.attr_type.val,
     }
     .expand_body(body)
 }

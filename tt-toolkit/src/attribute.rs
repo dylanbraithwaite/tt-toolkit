@@ -16,12 +16,16 @@ pub trait CheckAttribute<Attr> {
 
     fn check(
         &self,
-        ctx: &Self::Ctx,
         attr: &Attr,
+        ctx: &Self::Ctx,
     ) -> Result<Self::Check, Self::Error>;
 }
 
-impl<Attr, Expr: SynthAttribute<Attr>> SynthAttribute<Option<Attr>> for Expr {
+#[diagnostic::do_not_recommend]
+impl<Attr, Expr> SynthAttribute<Option<Attr>> for Expr
+where
+    Expr: SynthAttribute<Attr>,
+{
     type Error = Expr::Error;
 
     type Entry = Expr::Entry;
@@ -44,8 +48,10 @@ pub trait BidirAttribute<Attr>:
 {
 }
 
-impl<Expr: SynthAttribute<Attr>, Attr> CheckAttribute<Attr> for Expr
+#[diagnostic::do_not_recommend]
+impl<Expr, Attr> CheckAttribute<Attr> for Expr
 where
+    Expr: SynthAttribute<Attr>,
     Attr: ContextualEq<Expr::Entry, Expr::Ctx>,
     Expr::Error: From<Attr::Error>,
 {
@@ -57,16 +63,17 @@ where
 
     fn check(
         &self,
-        ctx: &Self::Ctx,
         attr: &Attr,
+        ctx: &Self::Ctx,
     ) -> Result<Self::Check, Self::Error> {
         Ok(Attr::equiv(ctx, &self.synth(ctx)?, attr)?)
     }
 }
 
-impl<Expr: SynthAttribute<Attr>, Attr> BidirAttribute<Attr> for Expr
+impl<Expr, Attr> BidirAttribute<Attr> for Expr
 where
     Attr: ContextualEq<Expr::Entry, Expr::Ctx>,
+    Expr: SynthAttribute<Attr>,
     Expr::Error: From<Attr::Error>,
 {
 }

@@ -1,86 +1,12 @@
+use attributes::HasAttributes;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote};
 use syn::{
-    Attribute, Expr, Field, Ident, Type, TypePath, parse::Parse, parse_quote,
+    Expr, Ident, Type, TypePath, parse::Parse, parse_quote,
 };
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
-use crate::attributes::{BINDING_NAME_ATTR, METADATA_ATTR, VAR_NAME_ATTR};
-
-pub trait HasAttributes {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute>;
-
-    fn find_attribute(&self, name: &str) -> Option<Attribute> {
-        self.find_all_attributes(name).into_iter().next()
-    }
-
-    fn has_attribute(&self, name: &str) -> bool {
-        self.find_attribute(name).is_some()
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize>;
-
-    fn parse_attribute<T>(&self, name: &str) -> Option<T>
-    where
-        T: Parse,
-    {
-        self.find_attribute(name)
-            .map(|attr| attr.parse_args().unwrap())
-    }
-}
-
-impl HasAttributes for [Attribute] {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
-        self.iter()
-            .filter(|attr| attr.path().is_ident(name))
-            .cloned()
-            .collect()
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize> {
-        self.iter().position(|attr| attr.path().is_ident(name))
-    }
-}
-
-impl HasAttributes for Field {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
-        self.attrs.find_all_attributes(name)
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize> {
-        self.attrs.attribute_position(name)
-    }
-}
-
-impl HasAttributes for VariantInfo<'_> {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
-        self.ast().attrs.find_all_attributes(name)
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize> {
-        self.ast().attrs.attribute_position(name)
-    }
-}
-
-impl HasAttributes for BindingInfo<'_> {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
-        self.ast().find_all_attributes(name)
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize> {
-        self.ast().attribute_position(name)
-    }
-}
-
-impl HasAttributes for Structure<'_> {
-    fn find_all_attributes(&self, name: &str) -> Vec<Attribute> {
-        self.ast().attrs.find_all_attributes(name)
-    }
-
-    fn attribute_position(&self, name: &str) -> Option<usize> {
-        self.ast().attrs.attribute_position(name)
-    }
-}
+pub mod attributes;
 
 pub fn _quote_all<I, T>(items: I) -> impl Iterator<Item = TokenStream>
 where
@@ -188,18 +114,6 @@ pub fn type_ident(ident: Ident) -> Type {
         qself: None,
         path: ident.into(),
     })
-}
-
-pub trait BindingInfoExt {
-    fn is_metadata(&self) -> bool;
-}
-
-impl BindingInfoExt for BindingInfo<'_> {
-    fn is_metadata(&self) -> bool {
-        self.has_attribute(METADATA_ATTR)
-            || self.has_attribute(VAR_NAME_ATTR)
-            || self.has_attribute(BINDING_NAME_ATTR)
-    }
 }
 
 pub fn option_none() -> Expr {

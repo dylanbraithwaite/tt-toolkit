@@ -6,6 +6,7 @@ use syn::{Ident, parse_quote, spanned::Spanned};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::attributes::*;
+use crate::utils::attributes::HasAttributes;
 
 fn ensure_can_be_debruijn_var(binding: &BindingInfo) {
     let attr = binding.find_attribute(DEBRUIJN_VAR_ATTR).unwrap();
