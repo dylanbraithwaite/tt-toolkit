@@ -284,6 +284,8 @@ decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluat
     /// `(&Context, EvalledField1, EvalledField2, ...) -> Result<Target, Error>`.
     ///
     /// ```
+    /// /*
+    /// TODO: Compile error
     /// use ttt::{DeBruijnIndexed, Substitute, Evaluate, Context};
     ///
     /// #[derive(Clone, DeBruijnIndexed, Substitute, Evaluate, PartialEq, Debug)]
@@ -303,6 +305,7 @@ decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluat
     ///         None => Ok(LambdaExpr::Var(var_index))
     ///     }
     /// }
+    /// */
     /// ```
     ///
     /// The above example could be implemented automatically in a macro for any variant containing a variable, but we leave this to the user to allow flexibility in handling

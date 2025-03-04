@@ -1,4 +1,4 @@
-use crate::Context;
+use crate::{Context, Never};
 
 pub trait ContextualEq<Entry, Ctx>
 where
@@ -14,6 +14,7 @@ where
     ) -> Result<Self::Check, Self::Error>;
 }
 
+
 pub trait SyntacticEq: PartialEq {}
 
 impl<Entry, Ctx, T> ContextualEq<Entry, Ctx> for T
@@ -22,7 +23,7 @@ where
     T: SyntacticEq,
 {
     type Check = bool;
-    type Error = std::convert::Infallible;
+    type Error = Never;
 
     fn equiv(
         _ctx: &Ctx,

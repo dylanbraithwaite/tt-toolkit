@@ -18,8 +18,17 @@ pub trait HasAttributes {
     where
         T: Parse,
     {
-        self.find_attribute(name)
+        self.parse_all_attributes(name).into_iter().next()
+    }
+
+    fn parse_all_attributes<T>(&self, name: &str) -> Vec<T>
+    where
+        T: Parse
+    {
+        self.find_all_attributes(name)
+            .into_iter()
             .map(|attr| attr.parse_args().unwrap())
+            .collect()
     }
 }
 

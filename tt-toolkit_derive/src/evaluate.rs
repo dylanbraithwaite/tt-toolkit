@@ -94,7 +94,7 @@ fn recursively_evalled_fields(
     variant
         .bindings()
         .iter()
-        .map(|binding| recursively_eval_field(binding))
+        .map(recursively_eval_field)
 }
 
 fn _recursively_normalised_fields(
@@ -103,7 +103,7 @@ fn _recursively_normalised_fields(
     variant
         .bindings()
         .iter()
-        .map(|binding| recursively_normalise_field(binding))
+        .map(recursively_normalise_field)
 }
 
 fn recursively_eval_field(binding: &BindingInfo) -> TokenStream {
@@ -185,7 +185,7 @@ fn variant_impl_unwrap(variant: &VariantInfo) -> TokenStream {
 
 fn variant_impl_default(variant: &VariantInfo) -> TokenStream {
     variant
-        .construct_from_bindings(|binding| recursively_normalise_field(binding))
+        .construct_from_bindings(recursively_normalise_field)
         .result_ok()
 }
 

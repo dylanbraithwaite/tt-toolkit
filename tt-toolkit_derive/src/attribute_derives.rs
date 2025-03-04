@@ -1,12 +1,13 @@
 use derive_syn_parse::Parse;
 use proc_macro_error2::abort;
 use proc_macro2::{Span, TokenStream};
-use quote::{quote, quote_spanned, ToTokens};
+use quote::{quote, ToTokens};
 use structmeta::StructMeta;
-use syn::{parse_quote, spanned::Spanned, token::Token, Arm, Attribute, Ident, Pat, Token, Type};
+use syn::{parse_quote, Arm, Attribute, Ident, Pat, Token, Type};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::utils::attributes::HasAttributes;
+use crate::utils::auto_deref;
 
 const CHECK_TYPES_ATTR: &str = "check_type";
 const SYNTH_TYPES_ATTR: &str = "synth_type";
@@ -25,6 +26,8 @@ struct CheckBlock {
     _semicolon: Token![;],
     arm: CheckArm,
 }
+
+struct BidirSynthBlock(SynthBlock);
 
 #[derive(Parse)]
 struct SynthArm {
@@ -46,15 +49,14 @@ struct CheckArm {
 }
 
 trait DesugarsToMatchArm {
-    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm;
+    fn desugar(&self, context_type: &Type) -> Arm;
 
     fn generate_match(
         &self,
         match_on: impl ToTokens,
         context_type: &Type,
-        attr_type: &Type,
     ) -> TokenStream {
-        let arm = self.desugar(context_type, attr_type);
+        let arm = self.desugar(context_type);
         // TODO: Erorr handling
         let err = quote! {
             panic!()
@@ -88,31 +90,47 @@ fn instantiate_dsl(
     }
 }
 
-impl DesugarsToMatchArm for SynthArm {
-    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm {
-        let pattern = &self.pattern;
-        let body = instantiate_dsl(context_type, &ctx_name(), attr_type, &self.body);
+impl DesugarsToMatchArm for SynthBlock {
+    fn desugar(&self, context_type: &Type) -> Arm {
+        let pattern = &self.arm.pattern;
+        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, &self.arm.body);
         parse_quote! {
-            #pattern => #body
+            #pattern => ::core::result::Result::Ok(#body)
         }
     }
 }
 
-impl DesugarsToMatchArm for CheckArm {
-    fn desugar(&self, context_type: &Type, attr_type: &Type) -> Arm {
-        let expr_pat = &self.expr_pat;
-        let type_pat = &self.type_pat;
-        let body = instantiate_dsl(context_type, &ctx_name(), attr_type, &self.body);
+impl DesugarsToMatchArm for CheckBlock {
+    fn desugar(&self, context_type: &Type) -> Arm {
+        let expr_pat = &self.arm.expr_pat;
+        let type_pat = &self.arm.type_pat;
+        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, &self.arm.body);
         parse_quote! {
-            (#expr_pat, #type_pat) => #body
+            (#expr_pat, #type_pat) => ::core::result::Result::Ok(#body)
+        }
+    }
+}
+
+impl DesugarsToMatchArm for BidirSynthBlock {
+    fn desugar(&self, context_type: &Type) -> Arm {
+        let pattern = &self.0.arm.pattern;
+        let attr_type = &self.0.attr_type;
+        let optional_attr_type: Type = parse_quote!(::core::option::Option<#attr_type>);
+        let body = instantiate_dsl(context_type, &ctx_name(), &optional_attr_type, &self.0.arm.body);
+        parse_quote! {
+            #pattern => ::core::result::Result::Ok({
+                ::spez::spez! {
+                    for __ttt_param = {#body};
+                    match #attr_type -> #optional_attr_type { ::core::option::Option::Some(__ttt_param) }
+                    match #optional_attr_type -> #optional_attr_type { __ttt_param }
+                }
+            })
         }
     }
 }
 
 fn ctx_name() -> Ident {
-    parse_quote! {
-        __ttt_context
-    }
+    parse_quote!(__ttt_context)
 }
 
 #[derive(StructMeta)]
@@ -187,11 +205,30 @@ fn opt_single_binding<'a>(
 ) -> Option<&'a BindingInfo<'a>> {
     let bindings = variant.bindings();
     if bindings.len() == 1 {
-        bindings.get(0)
+        bindings.first()
     } else {
         None
     }
 }
+
+
+fn opt_check_clause(variant: &VariantInfo, attr_type: &Type) -> Option<CheckBlock> {
+    variant.parse_all_attributes::<CheckBlock>("check")
+        .into_iter()
+        .find(|attr| attr.attr_type == *attr_type)
+}
+
+fn opt_synth_clause(variant: &VariantInfo, attr_type: &Type) -> Option<SynthBlock> {
+    variant.parse_all_attributes::<SynthBlock>("synth")
+        .into_iter()
+        .find(|attr| attr.attr_type == *attr_type)
+}
+
+fn opt_bidir_synth_clause(variant: &VariantInfo, attr_type: &Type) -> Option<BidirSynthBlock> {
+    opt_synth_clause(variant, attr_type).map(BidirSynthBlock)
+}
+
+
 
 fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
     let attr_type = &instance.attr_type;
@@ -201,40 +238,26 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
     let check_impl = input.each_variant(|variant| {
         let ctx_name = ctx_name();
         let attr_val = quote!(__ttt_check_value);
-        if let Some(check) = variant.parse_attribute::<CheckBlock>("check") {
+        if let Some(check) = opt_check_clause(variant, attr_type) {
             let bindings = variant
                 .bindings()
                 .iter()
-                // .map(ToTokens::into_token_stream)
-                // .chain(std::iter::once(attr_val))
-                .map(|binding| {
-                    quote_spanned! { binding.span() =>
-                        ::spez::spez! {
-                            for #binding;
-                            match<'a, T: ::core::ops::Deref> &'a T -> &'a T::Target {
-                                ::core::ops::Deref::deref(#binding)
-                            }
-                            match<T> T -> T { 
-                                #binding
-                            }
-                        }
-                    }
-                });
+                .map(auto_deref);
             let bindings = quote! { 
                 (
                     ( #(#bindings),* ), 
                     #attr_val 
                 ) 
             };
-            check.arm.generate_match(bindings, &instance.context, &instance.attr_type)
-        } else if let Some(node) = opt_single_binding(&variant) {
+            check.generate_match(bindings, &instance.context)
+        } else if let Some(node) = opt_single_binding(variant) {
             quote! {
                 #node.check(#ctx_name, __astlib_param_check_type)
             }
         } else {
             abort! {
                 variant.ast().ident.span(),
-                "Variant must specify a #[check_attr(...)] attribute"
+                "Variant must specify a #[check(...)] attribute"
             }
         }
     });
@@ -243,7 +266,7 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
         gen impl ::ttt::CheckAttribute<#attr_type> for @Self {
             type Ctx = #context_type;
             type Entry = #context_entry;
-            type Error = ();
+            type Error = ::ttt::DefaultError;
             type Check = bool;
 
             fn check(&self,
@@ -259,11 +282,165 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
 }
 
 fn derive_synth_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
-    todo!()
+    let attr_type = &instance.attr_type;
+    let context_entry = &instance.context_entry;
+    let context_type = &instance.context;
+
+    let synth_impl = input.each_variant(|variant| {
+        let ctx_name = ctx_name();
+        if let Some(synth) = opt_synth_clause(variant, attr_type) {
+            let bindings = variant
+                .bindings()
+                .iter()
+                .map(auto_deref);
+            let bindings = quote! { 
+                (
+                   #(#bindings),*
+                ) 
+            };
+            synth.generate_match(bindings, &instance.context)
+        } else if let Some(node) = opt_single_binding(variant) {
+            quote! {
+                #node.synth(#ctx_name)
+            }
+        } else {
+            abort! {
+                variant.ast().ident.span(),
+                "Variant must specify a #[synth(...)] attribute"
+            }
+        }
+    });
+
+    input.gen_impl(quote! {
+        gen impl ::ttt::SynthAttribute<#attr_type> for @Self {
+            type Ctx = #context_type;
+            type Entry = #context_entry;
+            type Error = ::ttt::DefaultError;
+            
+            fn synth(&self,
+                __ttt_context: &#context_type,
+            ) -> ::core::result::Result<#attr_type, Self::Error> {
+                match self {
+                    #synth_impl
+                }
+            }
+        }
+    })
 }
 
 fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
-    todo!()
+    let attr_type = &instance.attr_type;
+    let context_entry = &instance.context_entry;
+    let context_type = &instance.context;
+
+    let synth_impl = input.each_variant(|variant| {
+        let ctx_name = ctx_name();
+        if let Some(synth) = opt_bidir_synth_clause(variant, attr_type) {
+            let bindings = variant
+                .bindings()
+                .iter()
+                .map(auto_deref);
+            let bindings = quote! { 
+                (
+                   #(#bindings),* 
+                ) 
+            };
+            synth.generate_match(bindings, &instance.context)
+        } else if opt_check_clause(variant, attr_type).is_some() {
+            quote! {
+                ::core::result::Result::Ok(::core::option::Option::None)
+            }
+        } else if let Some(node) = opt_single_binding(variant) {
+            quote! {
+                #node.synth(#ctx_name)
+            }
+        } else {
+            quote! {
+                ::core::result::Result::Ok(::core::option::Option::None)
+            }
+        }
+    });
+
+    let check_impl = input.each_variant(|variant| {
+        let ctx_name = ctx_name();
+        let attr_val = quote!(__ttt_check_value);
+        if let Some(check) = opt_check_clause(variant, attr_type) {
+            let bindings = variant
+                .bindings()
+                .iter()
+                .map(auto_deref);
+            let bindings = quote! { 
+                (
+                    ( #(#bindings),* ), 
+                    #attr_val 
+                ) 
+            };
+            check.generate_match(bindings, &instance.context)
+        } else if let Some(synth) = opt_bidir_synth_clause(variant, attr_type) {
+            let bindings = variant
+                .bindings()
+                .iter()
+                .map(auto_deref);
+            let bindings = quote! { 
+                ( #(#bindings),* ) 
+            };
+            let synth_expr = synth.generate_match(bindings, &instance.context);
+            let synth_expr = quote! {
+                match {#synth_expr}? {
+                    ::core::option::Option::Some(__ttt_param) => __ttt_param,
+                    ::core::option::Option::None => panic!()
+                }
+            };
+            quote! {
+                ::core::result::Result::Ok(
+                    ::ttt::ContextualEq::<#context_entry, #context_type>::equiv(#ctx_name, #attr_val, &#synth_expr)?
+                )
+            }
+        } else if let Some(node) = opt_single_binding(variant) {
+            quote! {
+                #node.check(#ctx_name, __astlib_param_check_type)
+            }
+        } else {
+            abort! {
+                variant.ast().ident.span(),
+                "Variant must specify a #[check(...)] or #[synth(...)] attribute"
+            }
+        }
+    });
+
+    input.gen_impl(quote! {
+        gen impl ::ttt::SynthAttribute<::core::option::Option<#attr_type>> for @Self {
+            type Ctx = #context_type;
+            type Entry = #context_entry;
+            type Error = ::ttt::DefaultError;
+
+            fn synth(&self, __ttt_context: &#context_type) 
+                -> ::core::result::Result<::core::option::Option<#attr_type>, Self::Error> 
+            {
+                match self {
+                    #synth_impl
+                }
+            }
+        }
+
+        gen impl ::ttt::CheckAttribute<#attr_type> for @Self {
+            type Ctx = #context_type;
+            type Entry = #context_entry;
+            type Error = ::ttt::DefaultError;
+            type Check = bool;
+            
+            fn check(&self,
+                __ttt_check_value: &#attr_type,
+                __ttt_context: &#context_type,
+            ) -> ::core::result::Result<Self::Check, Self::Error> {
+                match self {
+                    #check_impl
+                }
+            }
+        }
+
+        gen impl ::ttt::BidirAttribute<#attr_type> for @Self {}
+    })
 }
 
 pub fn derive_check(mut input: Structure) -> TokenStream {
@@ -275,6 +452,7 @@ pub fn derive_check(mut input: Structure) -> TokenStream {
 }
 
 pub fn derive_synth(mut input: Structure) -> TokenStream {
+    input.bind_with(|_| synstructure::BindStyle::Move);
     attr_types(&input, SYNTH_TYPES_ATTR, "SynthAttribute")
         .into_iter()
         .map(|ty| derive_synth_one(&mut input, ty))
@@ -282,6 +460,7 @@ pub fn derive_synth(mut input: Structure) -> TokenStream {
 }
 
 pub fn derive_bidir(mut input: Structure) -> TokenStream {
+    input.bind_with(|_| synstructure::BindStyle::Move);
     attr_types(&input, BIDIR_TYPES_ATTR, "BidirAttribute")
         .into_iter()
         .map(|ty| derive_bidir_one(&mut input, ty))

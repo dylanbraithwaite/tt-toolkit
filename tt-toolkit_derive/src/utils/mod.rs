@@ -1,8 +1,8 @@
 use attributes::HasAttributes;
 use proc_macro2::TokenStream;
-use quote::{ToTokens, quote};
+use quote::{quote, quote_spanned, ToTokens,};
 use syn::{
-    Expr, Ident, Type, TypePath, parse::Parse, parse_quote,
+    Expr, Ident, Type, TypePath, parse::Parse, parse_quote, spanned::Spanned
 };
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
@@ -118,4 +118,50 @@ pub fn type_ident(ident: Ident) -> Type {
 
 pub fn option_none() -> Expr {
     parse_quote!(::core::option::Option::None)
+}
+
+pub fn auto_deref(toks: impl ToTokens) -> TokenStream {
+    quote_spanned! { toks.span() =>
+        ::spez::spez! {
+            for __ttt_param = #toks;
+            match<'a, T: ::core::ops::Deref> &'a T -> &'a T::Target {
+                ::core::ops::Deref::deref(__ttt_param)
+            }
+            match<T> T -> T { 
+                __ttt_param
+            }
+        }
+    }
+}
+
+pub fn auto_deref_for_trait(toks: impl ToTokens, trait_name: impl ToTokens) -> TokenStream {
+    quote_spanned! { toks.span() =>
+        {
+            ::spez::spez! {
+                for __ttt_param = #toks;
+                match<'a, T: #trait_name> &'a T -> &'a T { 
+                    __ttt_param
+                }
+                match<'a, T: ::core::ops::Deref> &'a T where T::Target: #trait_name -> &'a T::Target {
+                    ::core::ops::Deref::deref(__ttt_param)
+                }
+            }
+        }
+    }
+}
+
+pub fn auto_deref_for_type(toks: impl ToTokens, type_name: impl ToTokens) -> TokenStream {
+    quote_spanned! { toks.span() =>
+        {
+            ::spez::spez! {
+                for __ttt_param = #toks;
+                match<'a> &'a #type_name -> &'a #type_name { 
+                    __ttt_param
+                }
+                match<'a, T: ::core::ops::Deref<Target = #type_name>> &'a T -> &'a T::Target {
+                    ::core::ops::Deref::deref(__ttt_param)
+                }
+            }
+        }
+    }
 }

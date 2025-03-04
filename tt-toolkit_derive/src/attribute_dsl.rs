@@ -8,6 +8,7 @@ use syn::{
 };
 
 use crate::utils::attributes::HasAttributes;
+use crate::utils::{auto_deref_for_trait, auto_deref_for_type};
 
 const WHILE_EXPR_MARKER_ATTR: &str = "ttt_while_is_bind";
 
@@ -65,7 +66,7 @@ impl ExpandBindExpressions {
         quote! {
             {
                 let #ctx_name = #input_ctx;
-                ::core::result::Result::Ok(#body)
+                #body
             }
         }
     }
@@ -73,20 +74,23 @@ impl ExpandBindExpressions {
     fn expand_synth_expr(&self, synth_call: syn::ExprCall) -> Expr {
         let ctx_name = context_name();
         let span = synth_call.span();
+        let attr_type = &self.attr_type;
+        let synth_trait = &quote!(::ttt::SynthAttribute<#attr_type>);
         match synth_call.args.len() {
-            // By default let rust infer attribute type
             1 => {
-                let args = &synth_call.args;
+                // By default use type of current instantiation
+                // I'd like to use inference here, but the current (old) trait solver consistently chokes at this
+                let arg = auto_deref_for_trait(&synth_call.args, synth_trait);
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::synth(#args, &#ctx_name)?
+                    ::ttt::SynthAttribute::<#attr_type>::synth(#arg, #ctx_name)?
                 }
             }
             // Allow specifying attribute type as parameter in synth call
             2 => {
                 let attr_ty = synth_call.args.first().unwrap();
-                let expr = synth_call.args.last().unwrap();
+                let expr = auto_deref_for_trait(synth_call.args.last().unwrap(), synth_trait);
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::<#attr_ty>::synth(#expr, &#ctx_name)?
+                    ::ttt::SynthAttribute::<#attr_ty>::synth(#expr, #ctx_name)?
                 }
             }
             _ => abort!(
@@ -98,19 +102,36 @@ impl ExpandBindExpressions {
 
     fn expand_check_expr(&self, check_call: syn::ExprCall) -> Expr {
         let ctx_name = context_name();
-        let span = check_call.span();
         let attr_ty = &self.attr_type;
+        let span = check_call.span();
+        let check_trait = quote!(::ttt::CheckAttribute<#attr_ty>);
         match check_call.args.len() {
             2 => {
-                let args = check_call.args;
+                let mut args = check_call.args.into_iter();
+                let arg1 = auto_deref_for_trait(args.next().unwrap(), check_trait);
+                let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
                 // TODO: I'd like to not have to specify attr_ty here, so that
                 // check(..) calls can check other attribute types too, but
                 // the compiler fails to infer this, I think due to
                 // https://github.com/rust-lang/rust/issues/136856
                 parse_quote_spanned! { span =>
-                    ::ttt::CheckAttribute::<#attr_ty>::check(#args, #ctx_name)?
+                    ::ttt::CheckAttribute::<#attr_ty>::check(#arg1, #arg2, #ctx_name)?
                 }
             }
+            3 => {
+                let mut args = check_call.args.into_iter();
+                let attr_ty = &args.next().unwrap();
+                let arg1 = auto_deref_for_trait(args.next().unwrap(), check_trait);
+                let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
+                // TODO: I'd like to not have to specify attr_ty here, so that
+                // check(..) calls can check other attribute types too, but
+                // the compiler fails to infer this, I think due to
+                // https://github.com/rust-lang/rust/issues/136856
+                parse_quote_spanned! { span =>
+                    ::ttt::CheckAttribute::<#attr_ty>::check(#arg1, #arg2, #ctx_name)?
+                }
+            }
+
             _ => abort!(span, "`check` call should have exactly 2 parameters"),
         }
     }
@@ -134,7 +155,7 @@ impl ExpandBindExpressions {
             #label
             {
                 let #context =
-                    &<#context_ty as ::ttt::Context<_>>::append(&#context, ::core::clone::Clone::clone(#bindee));
+                    &<#context_ty as ::ttt::Context<_>>::append(&#context, ::core::clone::Clone::clone(&#bindee));
                 #body
             }
         }
@@ -168,6 +189,7 @@ impl syn::fold::Fold for ExpandBindExpressions {
         if irrefutable_pat(&local.pat) {
             return syn::fold::fold_local(self, local);
         }
+        
         if let Some(init) = local.init.as_mut() {
             if init.diverge.is_none() {
                 let span = init.eq_token.span();
@@ -187,7 +209,7 @@ impl syn::fold::Fold for ExpandBindExpressions {
             }
         }
 
-        return syn::fold::fold_local(self, local);
+        syn::fold::fold_local(self, local)
     }
 }
 

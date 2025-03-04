@@ -48,7 +48,7 @@ pub trait BidirAttribute<Attr>:
 {
 }
 
-#[diagnostic::do_not_recommend]
+// #[diagnostic::do_not_recommend]
 impl<Expr, Attr> CheckAttribute<Attr> for Expr
 where
     Expr: SynthAttribute<Attr>,
