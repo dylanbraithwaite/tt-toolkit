@@ -1,5 +1,4 @@
 use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute};
-use ttt_derive::SynthAttribute;
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {

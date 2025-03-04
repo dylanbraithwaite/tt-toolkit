@@ -1,5 +1,4 @@
 use ttt::{CheckAttribute, Context};
-use ttt_derive::CheckAttribute;
 
 #[derive(Clone, PartialEq)]
 enum Ty {

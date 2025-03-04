@@ -21,6 +21,12 @@ enum Expr {
     )]
     Lam(Box<Expr>),
 
+    #[synth(Ty; (src, body) =>
+        let Some(tgt) = bind src { synth(body) };
+        Ty::Func(src.clone().into(), tgt.into())
+    )]
+    TypedLam(Ty, Box<Expr>),
+
     #[synth(Ty; (Expr::Lam(body), arg) =>
         let Some(src): Option<Ty> = synth(arg);
         bind src { synth(body) }
@@ -35,16 +41,20 @@ enum Expr {
     Pair(Box<Expr>, Box<Expr>),
 }
 
-#[test]
+fn main() {
+    check_lambda();
+    check_lambda_app();
+    check_pair();
+}
+
 fn check_lambda() {
     use Expr::*;
     let expr = Lam(Unit.into());
     let ty = Ty::Func(Ty::Unit.into(), Ty::Unit.into());
 
-    assert!(CheckAttribute::<Ty>::check(&expr, &ty, &Context::empty()).unwrap())
+    assert!(CheckAttribute::<Ty>::check(&expr, &ty, &Context::empty()).unwrap());
 }
 
-#[test]
 fn check_pair() {
     let expr = {
         use Expr::*;
@@ -57,7 +67,6 @@ fn check_pair() {
     assert_eq!(SynthAttribute::<Option<Ty>>::synth(&expr, &Context::empty()).unwrap(), Some(ty))
 }
 
-#[test]
 fn check_lambda_app() {
     use Expr::*;
     let expr = App(Lam(Unit.into()).into(), Unit.into());

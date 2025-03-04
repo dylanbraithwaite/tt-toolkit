@@ -58,7 +58,7 @@ impl SubstDerive<'_> {
         let subst_ty = &self.ty;
         let target_ty = self.subst_target_type();
         let equal_case = quote! {{
-            let __tmp = spez::spez! {
+            let __tmp = ::ttt::spez::spez! {
                 for _ast_param_other;
                 match<T: ::std::convert::Into<#target_ty> + Clone> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::Some(
@@ -118,7 +118,7 @@ impl SubstDerive<'_> {
         let subst_ty = &self.ty;
         let target_ty = self.subst_target_type();
         let equal_case = quote! {{
-            let __tmp = spez::spez! {
+            let __tmp = ::ttt::spez::spez! {
                 for _ast_param_other;
                 match<T: ::std::convert::Into<#target_ty> + Clone> &T -> ::std::option::Option<#target_ty> {
                     ::std::option::Option::Some(

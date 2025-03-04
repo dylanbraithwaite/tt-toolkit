@@ -18,6 +18,9 @@ pub use ttt_derive::Evaluate;
 
 pub mod attribute;
 pub use attribute::{BidirAttribute, CheckAttribute, SynthAttribute};
+pub use ttt_derive::{BidirAttribute, SynthAttribute, CheckAttribute};
+
+pub use ::spez;
 
 mod never {
     pub

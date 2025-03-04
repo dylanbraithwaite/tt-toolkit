@@ -119,7 +119,7 @@ impl DesugarsToMatchArm for BidirSynthBlock {
         let body = instantiate_dsl(context_type, &ctx_name(), &optional_attr_type, &self.0.arm.body);
         parse_quote! {
             #pattern => ::core::result::Result::Ok({
-                ::spez::spez! {
+                ::ttt::spez::spez! {
                     for __ttt_param = {#body};
                     match #attr_type -> #optional_attr_type { ::core::option::Option::Some(__ttt_param) }
                     match #optional_attr_type -> #optional_attr_type { __ttt_param }

@@ -122,7 +122,7 @@ pub fn option_none() -> Expr {
 
 pub fn auto_deref(toks: impl ToTokens) -> TokenStream {
     quote_spanned! { toks.span() =>
-        ::spez::spez! {
+        ::ttt::spez::spez! {
             for __ttt_param = #toks;
             match<'a, T: ::core::ops::Deref> &'a T -> &'a T::Target {
                 ::core::ops::Deref::deref(__ttt_param)
@@ -137,7 +137,7 @@ pub fn auto_deref(toks: impl ToTokens) -> TokenStream {
 pub fn auto_deref_for_trait(toks: impl ToTokens, trait_name: impl ToTokens) -> TokenStream {
     quote_spanned! { toks.span() =>
         {
-            ::spez::spez! {
+            ::ttt::spez::spez! {
                 for __ttt_param = #toks;
                 match<'a, T: #trait_name> &'a T -> &'a T { 
                     __ttt_param
@@ -153,7 +153,7 @@ pub fn auto_deref_for_trait(toks: impl ToTokens, trait_name: impl ToTokens) -> T
 pub fn auto_deref_for_type(toks: impl ToTokens, type_name: impl ToTokens) -> TokenStream {
     quote_spanned! { toks.span() =>
         {
-            ::spez::spez! {
+            ::ttt::spez::spez! {
                 for __ttt_param = #toks;
                 match<'a> &'a #type_name -> &'a #type_name { 
                     __ttt_param
