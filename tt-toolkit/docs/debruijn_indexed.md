@@ -1,4 +1,4 @@
-Derives an implementation of the `ttt::DeBruijnIndexed` trait.
+Derives an implementation of the [`trait@DeBruijnIndexed`] trait.
 
 # Annotating variables
 

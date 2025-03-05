@@ -1,6 +1,6 @@
-Derives an implementation of the [ttt::Evaluate] trait.
+Derives an implementation of the [`trait@Evaluate`] trait.
 
-The default behaviour sets the associated type [Target](ttt::Evaluate::Target) to `Self`, and will call [evaluate](ttt::Evaluate::evaluate) recursively on each field
+The default behaviour sets the associated type [`Target`](type@Evaluate::Target) to `Self`, and will call [`evaluate`](Evaluate::evaluate) recursively on each field
 and will reconstruct the current variant from the evaluated fields.
 Custom evaluation behaviour can be specified with attributes on variants.
 
@@ -38,7 +38,7 @@ assert_eq!(evalled, Ok(Num(42)));
 ```
 
 ## Returning errors
-Evaluate patterns can use early returns to yield errors. By default the error type is set to [ttt::EvalError], but this can be overridden with the `#[eval_error_type]` attribute
+Evaluate patterns can use early returns to yield errors. By default the error type is set to [`EvalError`], but this can be overridden with the `#[eval_error_type]` attribute
 
 ```rust
 use ttt::Evaluate;
@@ -79,8 +79,8 @@ enum LambdaExpr {
 }
 ```
 
-In this example, the default error type [ttt::EvalError] implements `From<ttt::SubstError>`, so the `?` operator will convert any errors returned by `body.substitute(...)`
-and return them as an [EvalError](ttt::EvalError).
+In this example, the default error type [`EvalError`] implements `From<ttt::SubstError>`, so the `?` operator will convert any errors returned by `body.substitute(...)`
+and return them as an [`EvalError`].
 
 Evaluator patterns cannot access the evaluation context because they are intended for expressing short transformations on the syntax nodes.
 If you need to access the context you should specify an evaluator function, detailed in the next section.
