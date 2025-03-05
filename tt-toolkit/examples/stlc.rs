@@ -1,4 +1,4 @@
-use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute, CheckAttribute, BidirAttribute};
+use ttt::{contextual_eq::SyntacticEq, BidirAttribute, CheckAttribute, Context, DeBruijnIndexed, ListContext, SynthAttribute};
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {
@@ -10,22 +10,19 @@ enum Ty {
 impl SyntacticEq for Ty {}
 
 
-#[derive(Clone, BidirAttribute)]
+#[derive(Clone, BidirAttribute, DeBruijnIndexed)]
 #[bidir_type(Ty)]
 enum Expr {
     #[synth(Ty; _ => Ty::Unit)]
     Unit,
 
+    #[synth(Ty; var => lookup(*var) )]
+    Var(#[var_index] usize),
+
     #[check(Ty; body : Ty::Func(src, tgt) =>
         bind src { check(body, tgt) }
     )]
     Lam(Box<Expr>),
-
-    #[synth(Ty; (src, body) =>
-        let Some(tgt) = bind src { synth(body) };
-        Ty::Func(src.clone().into(), tgt.into())
-    )]
-    TypedLam(Ty, Box<Expr>),
 
     #[synth(Ty; (Expr::Lam(body), arg) =>
         let Some(src): Option<Ty> = synth(arg);
@@ -45,6 +42,13 @@ fn main() {
     check_lambda();
     check_lambda_app();
     check_pair();
+
+    let ty = Ty::Func(Ty::Unit.into(), Ty::Unit.into());
+    let ctx = ListContext::<Ty>::empty().append(ty.clone());
+    let expr = Expr::Var(0);
+    assert!(Expr::check(&expr, &ty, &ctx).unwrap());
+
+    println!("Success");
 }
 
 fn check_lambda() {

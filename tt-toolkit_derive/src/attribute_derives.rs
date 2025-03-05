@@ -49,14 +49,15 @@ struct CheckArm {
 }
 
 trait DesugarsToMatchArm {
-    fn desugar(&self, context_type: &Type) -> Arm;
+    fn desugar(&self, context_type: &Type, entry_type: &Type) -> Arm;
 
     fn generate_match(
         &self,
         match_on: impl ToTokens,
         context_type: &Type,
+        entry_type: &Type,
     ) -> TokenStream {
-        let arm = self.desugar(context_type);
+        let arm = self.desugar(context_type, entry_type);
         // TODO: Erorr handling
         let err = quote! {
             panic!()
@@ -76,6 +77,7 @@ fn instantiate_dsl(
     context_type: &Type,
     context: &Ident,
     attr_type: &Type,
+    entry_type: &Type,
     body: impl ToTokens,
 ) -> TokenStream {
     quote! {
@@ -84,6 +86,7 @@ fn instantiate_dsl(
             context_type = #context_type;
             context = #context;
             attr_type = #attr_type;
+            context_entry_type = #entry_type;
             #body
         }
         }
@@ -91,9 +94,9 @@ fn instantiate_dsl(
 }
 
 impl DesugarsToMatchArm for SynthBlock {
-    fn desugar(&self, context_type: &Type) -> Arm {
+    fn desugar(&self, context_type: &Type, entry_type: &Type) -> Arm {
         let pattern = &self.arm.pattern;
-        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, &self.arm.body);
+        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, entry_type, &self.arm.body,);
         parse_quote! {
             #pattern => ::core::result::Result::Ok(#body)
         }
@@ -101,10 +104,10 @@ impl DesugarsToMatchArm for SynthBlock {
 }
 
 impl DesugarsToMatchArm for CheckBlock {
-    fn desugar(&self, context_type: &Type) -> Arm {
+    fn desugar(&self, context_type: &Type, entry_type: &Type) -> Arm {
         let expr_pat = &self.arm.expr_pat;
         let type_pat = &self.arm.type_pat;
-        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, &self.arm.body);
+        let body = instantiate_dsl(context_type, &ctx_name(), &self.attr_type, entry_type, &self.arm.body);
         parse_quote! {
             (#expr_pat, #type_pat) => ::core::result::Result::Ok(#body)
         }
@@ -112,15 +115,16 @@ impl DesugarsToMatchArm for CheckBlock {
 }
 
 impl DesugarsToMatchArm for BidirSynthBlock {
-    fn desugar(&self, context_type: &Type) -> Arm {
+    fn desugar(&self, context_type: &Type, entry_type: &Type) -> Arm {
         let pattern = &self.0.arm.pattern;
         let attr_type = &self.0.attr_type;
         let optional_attr_type: Type = parse_quote!(::core::option::Option<#attr_type>);
-        let body = instantiate_dsl(context_type, &ctx_name(), &optional_attr_type, &self.0.arm.body);
+        let body = instantiate_dsl(context_type, &ctx_name(), &optional_attr_type, entry_type, &self.0.arm.body);
         parse_quote! {
             #pattern => ::core::result::Result::Ok({
+                let __ttt_param = #body;
                 ::ttt::spez::spez! {
-                    for __ttt_param = {#body};
+                    for __ttt_param;
                     match #attr_type -> #optional_attr_type { ::core::option::Option::Some(__ttt_param) }
                     match #optional_attr_type -> #optional_attr_type { __ttt_param }
                 }
@@ -249,7 +253,7 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
                     #attr_val 
                 ) 
             };
-            check.generate_match(bindings, &instance.context)
+            check.generate_match(bindings, &instance.context, &instance.context_entry)
         } else if let Some(node) = opt_single_binding(variant) {
             quote! {
                 #node.check(#ctx_name, __astlib_param_check_type)
@@ -298,7 +302,7 @@ fn derive_synth_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
                    #(#bindings),*
                 ) 
             };
-            synth.generate_match(bindings, &instance.context)
+            synth.generate_match(bindings, &instance.context, &instance.context_entry)
         } else if let Some(node) = opt_single_binding(variant) {
             quote! {
                 #node.synth(#ctx_name)
@@ -345,7 +349,7 @@ fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
                    #(#bindings),* 
                 ) 
             };
-            synth.generate_match(bindings, &instance.context)
+            synth.generate_match(bindings, &instance.context, &instance.context_entry)
         } else if opt_check_clause(variant, attr_type).is_some() {
             quote! {
                 ::core::result::Result::Ok(::core::option::Option::None)
@@ -375,7 +379,7 @@ fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
                     #attr_val 
                 ) 
             };
-            check.generate_match(bindings, &instance.context)
+            check.generate_match(bindings, &instance.context, &instance.context_entry)
         } else if let Some(synth) = opt_bidir_synth_clause(variant, attr_type) {
             let bindings = variant
                 .bindings()
@@ -384,7 +388,7 @@ fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
             let bindings = quote! { 
                 ( #(#bindings),* ) 
             };
-            let synth_expr = synth.generate_match(bindings, &instance.context);
+            let synth_expr = synth.generate_match(bindings, &instance.context, &instance.context_entry);
             let synth_expr = quote! {
                 match {#synth_expr}? {
                     ::core::option::Option::Some(__ttt_param) => __ttt_param,

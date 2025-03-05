@@ -46,6 +46,7 @@ fn replace_bind_tokens(input: TokenStream) -> TokenStream {
 
 struct ExpandBindExpressions {
     context_type: Type,
+    entry_type: Type,
     context: Expr,
     attr_type: Type,
 }
@@ -136,6 +137,38 @@ impl ExpandBindExpressions {
         }
     }
 
+    fn expand_lookup_expr(&self, lookup_call: syn::ExprCall) -> Expr {
+        let ctx_name = &self.context;
+        let ctx_ty = &self.context_type;
+        // TODO: Handle case where entry type is not attr_ty.
+        let entry_ty = &self.entry_type;
+        let span = lookup_call.span();
+        match lookup_call.args.len() {
+            1 => {
+                let mut args = lookup_call.args.into_iter();
+                let arg = args.next().unwrap();
+
+                // TODO: Error handling
+                parse_quote_spanned! { span => {
+                    let arg = #arg;
+                    let entry = <#ctx_ty as ::ttt::Context<#entry_ty>>::get(#ctx_name, arg);
+                    ::ttt::spez::spez! {
+                        for __ttt_context = (entry, arg);
+                        match<Entry: DeBruijnIndexed> (Option<Entry>, usize) -> Option<Entry> {
+                            __ttt_context.0.map(|entry| {
+                                ::ttt::DeBruijnIndexed::increment_indices_by(&entry, __ttt_context.1)
+                            })
+                        }
+                        match<Entry> (Option<Entry>, usize) -> Option<Entry> {
+                            __ttt_context.0
+                        }
+                    }
+                }}
+            }
+            _ => abort!(span, "`lookup` call should have exactly 1 parameter"),
+        }
+    }
+
     fn expand_bind_expr(&self, bind_expr: syn::ExprWhile) -> syn::Expr {
         let span = bind_expr.span();
 
@@ -162,6 +195,19 @@ impl ExpandBindExpressions {
     }
 }
 
+macro_rules! expand_calls {
+    ($match_on: expr; $($ident: ident => $func: expr),*, _ => $default: expr $(,)?) => {
+        match $match_on {
+            $(
+                Expr::Path(path) if path.path.is_ident(stringify!($ident)) => {
+                    $func
+                },
+            )*
+            _ => $default,
+        }
+    };
+}
+
 impl syn::fold::Fold for ExpandBindExpressions {
     fn fold_expr(&mut self, expr: syn::Expr) -> syn::Expr {
         let out = match expr {
@@ -170,13 +216,10 @@ impl syn::fold::Fold for ExpandBindExpressions {
             {
                 self.expand_bind_expr(while_expr)
             }
-            Expr::Call(call_expr) => match call_expr.func.as_ref() {
-                Expr::Path(path) if path.path.is_ident("synth") => {
-                    self.expand_synth_expr(call_expr)
-                }
-                Expr::Path(path) if path.path.is_ident("check") => {
-                    self.expand_check_expr(call_expr)
-                }
+            Expr::Call(call_expr) => expand_calls! { call_expr.func.as_ref();
+                synth => self.expand_synth_expr(call_expr),
+                check => self.expand_check_expr(call_expr),
+                lookup => self.expand_lookup_expr(call_expr),
                 _ => Expr::Call(call_expr),
             },
             expr => expr,
@@ -189,7 +232,7 @@ impl syn::fold::Fold for ExpandBindExpressions {
         if irrefutable_pat(&local.pat) {
             return syn::fold::fold_local(self, local);
         }
-        
+
         if let Some(init) = local.init.as_mut() {
             if init.diverge.is_none() {
                 let span = init.eq_token.span();
@@ -217,6 +260,7 @@ mod kw {
     syn::custom_keyword!(context);
     syn::custom_keyword!(context_type);
     syn::custom_keyword!(attr_type);
+    syn::custom_keyword!(context_entry_type);
 }
 
 struct KeyVal<K, V> {
@@ -241,6 +285,7 @@ struct DslInstantiation {
     context_type: KeyVal<kw::context_type, Type>,
     context: KeyVal<kw::context, Expr>,
     attr_type: KeyVal<kw::attr_type, Type>,
+    entry_type: KeyVal<kw::context_entry_type, Type>,
     body: TokenStream,
 }
 
@@ -250,6 +295,7 @@ impl Parse for DslInstantiation {
             context_type: input.parse()?,
             context: input.parse()?,
             attr_type: input.parse()?,
+            entry_type: input.parse()?,
             body: input.parse()?,
         })
     }
@@ -300,6 +346,7 @@ pub fn attr_dsl(input: TokenStream) -> TokenStream {
     ExpandBindExpressions {
         context_type: instantiation.context_type.val,
         context: instantiation.context.val,
+        entry_type: instantiation.entry_type.val,
         attr_type: instantiation.attr_type.val,
     }
     .expand_body(body)
