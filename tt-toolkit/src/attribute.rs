@@ -6,6 +6,10 @@ pub trait SynthAttribute<Attr> {
     type Entry;
     type Ctx: Context<Self::Entry>;
     fn synth(&self, ctx: &Self::Ctx) -> Result<Attr, Self::Error>;
+
+    fn synth_closed(&self) -> Result<Attr, Self::Error> {
+        self.synth(&Context::empty())
+    }
 }
 
 pub trait CheckAttribute<Attr> {
@@ -19,6 +23,10 @@ pub trait CheckAttribute<Attr> {
         attr: &Attr,
         ctx: &Self::Ctx,
     ) -> Result<Self::Check, Self::Error>;
+
+    fn check_closed(&self, attr: &Attr) -> Result<Self::Check, Self::Error> {
+        self.check(attr, &Context::empty())
+    }
 }
 
 #[diagnostic::do_not_recommend]
@@ -48,7 +56,6 @@ pub trait BidirAttribute<Attr>:
 {
 }
 
-// #[diagnostic::do_not_recommend]
 impl<Expr, Attr> CheckAttribute<Attr> for Expr
 where
     Expr: SynthAttribute<Attr>,

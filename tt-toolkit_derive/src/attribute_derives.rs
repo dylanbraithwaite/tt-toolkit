@@ -179,7 +179,6 @@ impl TryFrom<Attribute> for AttrSpec {
 fn attr_types(
     structure: &Structure,
     attr_name: &str,
-    derive_name: &str,
 ) -> Vec<AttrSpec> {
     let attrs: syn::Result<Vec<AttrSpec>> = structure
         .find_all_attributes(attr_name)
@@ -193,12 +192,6 @@ fn attr_types(
             "Error while parsing #[{}(...)] attribute", attr_name;
             note = "{}", e;
             help = "The input to this attribute should be a list of type names.";
-        ),
-        Ok(parsed) if parsed.is_empty() => abort!(
-            Span::call_site(),
-            "{} derive requires the {} attribute to be specified on the deriving type",
-            derive_name,
-            attr_name
         ),
         Ok(parsed) => parsed,
     }
@@ -232,9 +225,26 @@ fn opt_bidir_synth_clause(variant: &VariantInfo, attr_type: &Type) -> Option<Bid
     opt_synth_clause(variant, attr_type).map(BidirSynthBlock)
 }
 
+// fn auto_evaluate(binding: &BindingInfo) -> TokenStream {
+//     // ::ttt::Evaluate::evaluate(#expr, #ctx, #under_binders)?
+//     quote_spanned! { binding.span() =>
+//         ::ttt::spez::spez! {
+//             for __ttt_param = #binding;
+//             match<'a, T: ::core::ops::Deref> &'a T where T::Target: ::ttt::Evaluate -> &'a T::Target {
+//                 ::ttt::Evaluate::evaluate(
+//                     ::core::ops::Deref::deref(__ttt_param),
+
+//             }
+//             match<T> T -> T { 
+//                 __ttt_param
+//             }
+//         }
+//     }
+// }
 
 
-fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
+
+fn derive_check_one(input: &Structure, instance: AttrSpec) -> TokenStream {
     let attr_type = &instance.attr_type;
     let context_entry = &instance.context_entry;
     let context_type = &instance.context;
@@ -285,7 +295,7 @@ fn derive_check_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
     })
 }
 
-fn derive_synth_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
+fn derive_synth_one(input: &Structure, instance: AttrSpec) -> TokenStream {
     let attr_type = &instance.attr_type;
     let context_entry = &instance.context_entry;
     let context_type = &instance.context;
@@ -332,7 +342,7 @@ fn derive_synth_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
     })
 }
 
-fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
+fn derive_bidir_one(input: &Structure, instance: AttrSpec) -> TokenStream {
     let attr_type = &instance.attr_type;
     let context_entry = &instance.context_entry;
     let context_type = &instance.context;
@@ -447,26 +457,31 @@ fn derive_bidir_one(input: &mut Structure, instance: AttrSpec) -> TokenStream {
     })
 }
 
-pub fn derive_check(mut input: Structure) -> TokenStream {
+pub fn derive_attributed(mut input: Structure) -> TokenStream {
     input.bind_with(|_| synstructure::BindStyle::Move);
-    attr_types(&input, CHECK_TYPES_ATTR, "CheckAttribute")
-        .into_iter()
-        .map(|ty| derive_check_one(&mut input, ty))
-        .collect()
-}
+   
+    if !(input.has_attribute(CHECK_TYPES_ATTR) || input.has_attribute(SYNTH_TYPES_ATTR) || input.has_attribute(BIDIR_TYPES_ATTR)) {
+        abort!(
+            Span::call_site(),
+            "Attributed derive requires at least one of the following attributes to be specified on the deriving type: {}, {}, {}",
+            CHECK_TYPES_ATTR,
+            SYNTH_TYPES_ATTR,
+            BIDIR_TYPES_ATTR
+        )
+    }
 
-pub fn derive_synth(mut input: Structure) -> TokenStream {
-    input.bind_with(|_| synstructure::BindStyle::Move);
-    attr_types(&input, SYNTH_TYPES_ATTR, "SynthAttribute")
+    let checks = attr_types(&input, CHECK_TYPES_ATTR)
         .into_iter()
-        .map(|ty| derive_synth_one(&mut input, ty))
-        .collect()
-}
+        .map(|ty| derive_check_one(&input, ty));
 
-pub fn derive_bidir(mut input: Structure) -> TokenStream {
-    input.bind_with(|_| synstructure::BindStyle::Move);
-    attr_types(&input, BIDIR_TYPES_ATTR, "BidirAttribute")
+    let synths = attr_types(&input, SYNTH_TYPES_ATTR)
         .into_iter()
-        .map(|ty| derive_bidir_one(&mut input, ty))
-        .collect()
+        .map(|ty| derive_synth_one(&input, ty));
+
+    let bidirs = attr_types(&input, BIDIR_TYPES_ATTR)
+        .into_iter()
+        .map(|ty| derive_bidir_one(&input, ty));
+
+    checks.chain(synths).chain(bidirs).collect()
+
 }

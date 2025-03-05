@@ -1,4 +1,4 @@
-use ttt::{CheckAttribute, Context};
+use ttt::{CheckAttribute, Context, Attributed};
 
 #[derive(Clone, PartialEq)]
 enum Ty {
@@ -8,7 +8,7 @@ enum Ty {
 }
 
 
-#[derive(Clone, CheckAttribute)]
+#[derive(Clone, Attributed)]
 #[check_type(Ty)]
 enum Expr {
     #[check(Ty; () : Ty::Unit => true )]

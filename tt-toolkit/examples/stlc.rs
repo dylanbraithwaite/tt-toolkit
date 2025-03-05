@@ -1,4 +1,4 @@
-use ttt::{contextual_eq::SyntacticEq, BidirAttribute, CheckAttribute, Context, DeBruijnIndexed, ListContext, SynthAttribute};
+use ttt::{contextual_eq::SyntacticEq, Attributed, CheckAttribute, Context, DeBruijnIndexed, ListContext, SynthAttribute};
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {
@@ -10,7 +10,7 @@ enum Ty {
 impl SyntacticEq for Ty {}
 
 
-#[derive(Clone, BidirAttribute, DeBruijnIndexed)]
+#[derive(Clone, Attributed, DeBruijnIndexed)]
 #[bidir_type(Ty)]
 enum Expr {
     #[synth(Ty; _ => Ty::Unit)]

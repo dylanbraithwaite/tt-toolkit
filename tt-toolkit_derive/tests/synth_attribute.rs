@@ -1,4 +1,4 @@
-use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute};
+use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute, Attributed};
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {
@@ -10,7 +10,7 @@ enum Ty {
 impl SyntacticEq for Ty {}
 
 
-#[derive(Clone, SynthAttribute)]
+#[derive(Clone, Attributed)]
 #[synth_type(Ty)]
 enum Expr {
     #[synth(Ty; _ => Ty::Unit)]

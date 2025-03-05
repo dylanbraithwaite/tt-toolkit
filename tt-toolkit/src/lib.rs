@@ -1,25 +1,36 @@
 pub mod debruijn_indexed;
+#[doc(inline)]
 pub use debruijn_indexed::DeBruijnIndexed;
+#[doc(inline)]
 pub use ttt_derive::DeBruijnIndexed;
 
 pub mod substitute;
+#[doc(inline)]
 pub use substitute::{SubstError, Substitute};
+#[doc(inline)]
 pub use ttt_derive::Substitute;
 
 pub mod context;
+#[doc(inline)]
 pub use context::{Context, ListContext, PartialContext};
 
 pub mod contextual_eq;
+#[doc(inline)]
 pub use contextual_eq::ContextualEq;
 
 pub mod evaluate;
+#[doc(inline)]
 pub use evaluate::{EvalError, Evaluate};
+#[doc(inline)]
 pub use ttt_derive::Evaluate;
 
 pub mod attribute;
+#[doc(inline)]
 pub use attribute::{BidirAttribute, CheckAttribute, SynthAttribute};
-pub use ttt_derive::{BidirAttribute, SynthAttribute, CheckAttribute};
+#[doc(inline)]
+pub use ttt_derive::Attributed;
 
+#[doc(hidden)]
 pub use ::spez;
 
 mod never {
