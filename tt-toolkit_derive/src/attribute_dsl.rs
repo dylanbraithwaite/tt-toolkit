@@ -1,7 +1,7 @@
 use proc_macro_error2::abort;
 use proc_macro2::{Group, TokenStream, TokenTree};
 use quote::{ToTokens, quote, quote_spanned};
-use syn::parse::{Parse, Parser};
+use syn::parse::Parser;
 use syn::{
     Block, Expr, Ident, Pat, Stmt, Token, Type, fold::Fold, parse_quote,
     parse_quote_spanned, spanned::Spanned, token,
@@ -44,14 +44,14 @@ fn replace_bind_tokens(input: TokenStream) -> TokenStream {
         .collect()
 }
 
-struct ExpandBindExpressions {
+struct DslParams {
     context_type: Type,
     entry_type: Type,
     context: Expr,
     attr_type: Type,
 }
 
-impl ExpandBindExpressions {
+impl DslParams {
     fn expand_body(&mut self, body: Vec<Stmt>) -> TokenStream {
         let span = quote!(#(#body)*).span();
 
@@ -208,7 +208,7 @@ macro_rules! expand_calls {
     };
 }
 
-impl syn::fold::Fold for ExpandBindExpressions {
+impl syn::fold::Fold for DslParams {
     fn fold_expr(&mut self, expr: syn::Expr) -> syn::Expr {
         let out = match expr {
             Expr::While(while_expr)
@@ -256,51 +256,6 @@ impl syn::fold::Fold for ExpandBindExpressions {
     }
 }
 
-mod kw {
-    syn::custom_keyword!(context);
-    syn::custom_keyword!(context_type);
-    syn::custom_keyword!(attr_type);
-    syn::custom_keyword!(context_entry_type);
-}
-
-struct KeyVal<K, V> {
-    _key_token: K,
-    _eq_token: Token![=],
-    val: V,
-    _comma_token: Token![;],
-}
-
-impl<K: Parse, V: Parse> Parse for KeyVal<K, V> {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(KeyVal {
-            _key_token: input.parse()?,
-            _eq_token: input.parse()?,
-            val: input.parse()?,
-            _comma_token: input.parse()?,
-        })
-    }
-}
-
-struct DslInstantiation {
-    context_type: KeyVal<kw::context_type, Type>,
-    context: KeyVal<kw::context, Expr>,
-    attr_type: KeyVal<kw::attr_type, Type>,
-    entry_type: KeyVal<kw::context_entry_type, Type>,
-    body: TokenStream,
-}
-
-impl Parse for DslInstantiation {
-    fn parse(input: syn::parse::ParseStream) -> syn::Result<Self> {
-        Ok(DslInstantiation {
-            context_type: input.parse()?,
-            context: input.parse()?,
-            attr_type: input.parse()?,
-            entry_type: input.parse()?,
-            body: input.parse()?,
-        })
-    }
-}
-
 fn irrefutable_pat(pat: &Pat) -> bool {
     match pat {
         Pat::Ident(syn::PatIdent { subpat: None, .. }) | Pat::Wild(_) => true,
@@ -336,18 +291,20 @@ macro_rules! unwrap_parsed {
     };
 }
 
-pub fn attr_dsl(input: TokenStream) -> TokenStream {
-    let instantiation: DslInstantiation =
-        unwrap_parsed!(DslInstantiation::parse.parse2(input));
+pub fn instantiate_dsl(
+    context_type: &Type,
+    context: &Expr,
+    attr_type: &Type,
+    entry_type: &Type,
+    body: impl ToTokens,
+) -> TokenStream {
     let body = unwrap_parsed!(
-        Block::parse_within.parse2(replace_bind_tokens(instantiation.body))
-    );
-
-    ExpandBindExpressions {
-        context_type: instantiation.context_type.val,
-        context: instantiation.context.val,
-        entry_type: instantiation.entry_type.val,
-        attr_type: instantiation.attr_type.val,
-    }
-    .expand_body(body)
+        Block::parse_within.parse2(replace_bind_tokens(body.to_token_stream()))
+    ); 
+    DslParams {
+        context_type: context_type.clone(),
+        context: context.clone(),
+        attr_type: attr_type.clone(),
+        entry_type: entry_type.clone(),
+    }.expand_body(body)
 }

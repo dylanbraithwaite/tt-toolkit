@@ -3,9 +3,10 @@ use proc_macro_error2::abort;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use structmeta::StructMeta;
-use syn::{parse_quote, Arm, Attribute, Ident, Pat, Token, Type};
+use syn::{parse_quote, Arm, Attribute, Expr, Ident, Pat, Token, Type};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
+use crate::attribute_dsl::instantiate_dsl;
 use crate::utils::attributes::HasAttributes;
 use crate::utils::auto_deref;
 
@@ -73,26 +74,6 @@ trait DesugarsToMatchArm {
     }
 }
 
-fn instantiate_dsl(
-    context_type: &Type,
-    context: &Ident,
-    attr_type: &Type,
-    entry_type: &Type,
-    body: impl ToTokens,
-) -> TokenStream {
-    quote! {
-        {
-        ::ttt_derive::attr_dsl! {
-            context_type = #context_type;
-            context = #context;
-            attr_type = #attr_type;
-            context_entry_type = #entry_type;
-            #body
-        }
-        }
-    }
-}
-
 impl DesugarsToMatchArm for SynthBlock {
     fn desugar(&self, context_type: &Type, entry_type: &Type) -> Arm {
         let pattern = &self.arm.pattern;
@@ -133,7 +114,7 @@ impl DesugarsToMatchArm for BidirSynthBlock {
     }
 }
 
-fn ctx_name() -> Ident {
+fn ctx_name() -> Expr {
     parse_quote!(__ttt_context)
 }
 

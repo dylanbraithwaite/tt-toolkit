@@ -29,12 +29,6 @@ decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluat
 
 mod attribute_dsl;
 
-#[proc_macro]
-#[proc_macro_error]
-pub fn attr_dsl(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
-    attribute_dsl::attr_dsl(input.into()).into()
-}
-
 mod attribute_derives;
 decl_derive! { [Attributed, attributes(check, check_type, synth, synth_type, bidir_type)] =>
     #[proc_macro_error]
