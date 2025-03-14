@@ -46,6 +46,19 @@ impl<T: DeBruijnIndexed> DeBruijnIndexed for Box<T> {
     }
 }
 
+impl<T: DeBruijnIndexed> DeBruijnIndexed for std::rc::Rc<T> {
+    fn map_indices_from<F>(&self, start: usize, map_fn: F) -> Self
+    where
+        F: Fn(usize) -> usize + Clone,
+    {
+        (**self).map_indices_from(start, map_fn).into()
+    }
+
+    fn get_var(&self) -> Option<usize> {
+        DeBruijnIndexed::get_var(&**self)
+    }
+}
+
 impl<T: DeBruijnIndexed> DeBruijnIndexed for Option<T> {
     fn map_indices_from<F>(&self, start: usize, map_fn: F) -> Self
     where

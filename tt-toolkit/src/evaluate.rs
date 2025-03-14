@@ -60,3 +60,20 @@ impl<T: Evaluate> Evaluate for Box<T> {
         (**self).evaluate(ctx, under_binders)
     }
 }
+
+impl<T: Evaluate> Evaluate for std::rc::Rc<T> {
+    type Target = T::Target;
+
+    type Error = T::Error;
+
+    type Context = T::Context;
+
+    fn evaluate(
+        &self,
+        ctx: &Self::Context,
+        under_binders: bool,
+    ) -> Result<Self::Target, Self::Error> {
+        (**self).evaluate(ctx, under_binders)
+    }
+}
+

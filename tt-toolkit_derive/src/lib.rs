@@ -10,7 +10,7 @@ use synstructure::decl_derive;
 
 
 mod debruijn_indexed;
-decl_derive! { [DeBruijnIndexed, attributes(var_index, variable, binding, metadata)] =>
+decl_derive! { [DeBruijnIndexed, attributes(var_index, variable, binding, metadata, var_name)] =>
     #[proc_macro_error]
     debruijn_indexed::derive
 }
