@@ -1,5 +1,4 @@
-use syn::{parse::Parse, Attribute};
-
+use syn::{Attribute, parse::Parse};
 
 pub trait HasAttributes {
     fn find_all_attributes(&self, name: &str) -> Vec<Attribute>;
@@ -21,9 +20,17 @@ pub trait HasAttributes {
         self.parse_all_attributes(name).into_iter().next()
     }
 
+    fn parse_attribute_with_default<T, F>(&self, name: &str, default: F) -> T
+    where
+        T: Parse,
+        F: Fn() -> T,
+    {
+        self.parse_attribute(name).unwrap_or_else(default)
+    }
+
     fn parse_all_attributes<T>(&self, name: &str) -> Vec<T>
     where
-        T: Parse
+        T: Parse,
     {
         self.find_all_attributes(name)
             .into_iter()

@@ -3,7 +3,7 @@ use proc_macro_error2::abort;
 use proc_macro2::{Span, TokenStream};
 use quote::{quote, ToTokens};
 use structmeta::StructMeta;
-use syn::{parse_quote, Arm, Attribute, Expr, Ident, Pat, Token, Type};
+use syn::{parse_quote, Arm, Attribute, Expr, Pat, Token, Type};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::attribute_dsl::instantiate_dsl;

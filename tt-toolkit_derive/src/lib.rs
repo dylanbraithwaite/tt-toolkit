@@ -1,5 +1,5 @@
 //! Derive macros for the [tt-toolkit](https://crates.io/crates/tt-toolkit) crate.
-//! 
+//!
 //! Documentation for the macros defined here can be found in the docs for the main crate.
 
 mod attributes;
@@ -8,7 +8,6 @@ mod utils;
 use proc_macro_error2::proc_macro_error;
 use synstructure::decl_derive;
 
-
 mod debruijn_indexed;
 decl_derive! { [DeBruijnIndexed, attributes(var_index, variable, binding, metadata, var_name)] =>
     #[proc_macro_error]
@@ -16,13 +15,13 @@ decl_derive! { [DeBruijnIndexed, attributes(var_index, variable, binding, metada
 }
 
 mod substitute;
-decl_derive! { [Substitute, attributes(var_index, subst_types, variable, binding)] =>
+decl_derive! { [Substitute, attributes(var_index, subst_types, variable, binding, inherit_subst_types)] =>
     #[proc_macro_error]
     substitute::derive
 }
 
 mod evaluate;
-decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluate_with, evaluate_pattern, metadata, var_name, eval_error_type)] =>
+decl_derive! { [Evaluate, attributes(eval_target, context_type, binding, evaluate_with, evaluate_pattern, evaluate_unwrap_variant, metadata, var_name, eval_error_type)] =>
     #[proc_macro_error]
     evaluate::derive
 }

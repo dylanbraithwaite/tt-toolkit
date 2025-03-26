@@ -1,21 +1,26 @@
 use proc_macro_error2::abort;
 use proc_macro2::TokenStream;
 use quote::{ToTokens, quote, quote_spanned};
-use syn::{Type, punctuated::Punctuated, spanned::Spanned, token::Comma};
+use syn::{
+    GenericParam, Type, parse_quote, punctuated::Punctuated, spanned::Spanned,
+    token::Comma,
+};
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
 use crate::{
     attributes::{
-        BINDING_ATTR, DEBRUIJN_VAR_ATTR, SUBST_TYPES_ATTR, VAR_WRAPPER_ATTR,
+        BINDING_ATTR, DEBRUIJN_VAR_ATTR, IsMetadata, SUBST_TYPES_ATTR,
+        VAR_WRAPPER_ATTR,
     },
-    attributes::IsMetadata,
-    utils::attributes::HasAttributes,
-    utils::{VariantInfoExt, type_ident},
+    utils::{
+        StructureExt, VariantInfoExt, attributes::HasAttributes, type_ident,
+    },
 };
 
 struct SubstDerive<'a> {
     ast: &'a Structure<'a>,
     ty: Type,
+    impl_generics: Vec<GenericParam>,
 }
 
 impl SubstDerive<'_> {
@@ -38,7 +43,7 @@ impl SubstDerive<'_> {
         if self.ast_is_var_wrapper() {
             self.ty.clone()
         } else {
-            type_ident(self.ast.ast().ident.clone())
+            self.ast.type_name()
         }
     }
 
@@ -218,10 +223,17 @@ impl ToTokens for SubstDerive<'_> {
         let subst_type = &self.ty;
         let subst_target_type = self.subst_target_type();
 
+        let extra_generics = &self.impl_generics;
+        let extra_generics = if !extra_generics.is_empty() {
+            quote!(<#(#extra_generics),*>)
+        } else {
+            quote!()
+        };
+
         // TODO: #[subst_infallible] attribute to check that all possible substitutions will be valid,
         // and set Error to ::std::convert::Infallible.
         self.ast.gen_impl(quote! {
-            gen impl ::ttt::Substitute<#subst_type> for @Self {
+            gen impl #extra_generics ::ttt::Substitute<#subst_type> for @Self {
                 type Target = #subst_target_type;
                 type Error = ::ttt::SubstError;
 
@@ -257,8 +269,33 @@ fn substitutee_types(ast: &Structure) -> Vec<Type> {
 
 pub fn derive(mut ast: Structure) -> TokenStream {
     ast.bind_with(|_| synstructure::BindStyle::Move);
-    substitutee_types(&ast)
-        .into_iter()
-        .map(|ty| SubstDerive { ast: &ast, ty }.to_token_stream())
-        .collect()
+    ast.add_bounds(synstructure::AddBounds::Generics);
+    if let Some(passthrough_ty) =
+        ast.parse_attribute::<Type>("inherit_subst_types")
+    {
+        // ast.add_impl_generic(parse_quote!(__TTTSubstType));
+        ast.add_where_predicate(parse_quote! {
+            #passthrough_ty : ::ttt::Substitute<__TTTSubstType, Error = ::ttt::SubstError, Target = #passthrough_ty>
+        });
+        SubstDerive {
+            ast: &ast,
+            ty: parse_quote!(__TTTSubstType),
+            impl_generics: vec![
+                parse_quote!(__TTTSubstType : ::ttt::DeBruijnIndexed),
+            ],
+        }
+        .to_token_stream()
+    } else {
+        substitutee_types(&ast)
+            .into_iter()
+            .map(|ty| {
+                SubstDerive {
+                    ast: &ast,
+                    ty,
+                    impl_generics: Vec::new(),
+                }
+                .to_token_stream()
+            })
+            .collect()
+    }
 }

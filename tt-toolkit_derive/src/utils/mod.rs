@@ -1,8 +1,8 @@
 use attributes::HasAttributes;
 use proc_macro2::TokenStream;
-use quote::{quote, quote_spanned, ToTokens,};
+use quote::{ToTokens, quote, quote_spanned};
 use syn::{
-    Expr, Ident, Type, TypePath, parse::Parse, parse_quote, spanned::Spanned
+    Expr, Ident, Type, TypePath, parse::Parse, parse_quote, spanned::Spanned,
 };
 use synstructure::{BindingInfo, Structure, VariantInfo};
 
@@ -41,6 +41,12 @@ pub trait ToTokensExt: ToTokens + Sized {
         }
     }
 
+    fn intoed_explicit(&self, ty: &Type) -> TokenStream {
+        quote! {
+            ::core::convert::Into::<#ty>::into(#self)
+        }
+    }
+
     fn intoed(&self) -> TokenStream {
         quote! {
             ::core::convert::Into::into(#self)
@@ -75,6 +81,8 @@ pub trait StructureExt {
         &self,
         f: impl Fn(&BindingInfo) -> TokenStream,
     ) -> TokenStream;
+
+    fn type_name(&self) -> Type;
 }
 
 impl VariantInfoExt for VariantInfo<'_> {
@@ -107,6 +115,13 @@ impl StructureExt for Structure<'_> {
     ) -> TokenStream {
         self.each_variant(|variant| variant.construct_from_bindings(&f))
     }
+
+    fn type_name(&self) -> Type {
+        let ident = &self.ast().ident;
+        let (_, ty_generics, _) = self.ast().generics.split_for_impl();
+
+        parse_quote!(#ident #ty_generics)
+    }
 }
 
 pub fn type_ident(ident: Ident) -> Type {
@@ -127,19 +142,22 @@ pub fn auto_deref(toks: impl ToTokens) -> TokenStream {
             match<'a, T: ::core::ops::Deref> &'a T -> &'a T::Target {
                 ::core::ops::Deref::deref(__ttt_param)
             }
-            match<T> T -> T { 
+            match<T> T -> T {
                 __ttt_param
             }
         }
     }
 }
 
-pub fn auto_deref_for_trait(toks: impl ToTokens, trait_name: impl ToTokens) -> TokenStream {
+pub fn auto_deref_for_trait(
+    toks: impl ToTokens,
+    trait_name: impl ToTokens,
+) -> TokenStream {
     quote_spanned! { toks.span() =>
         {
             ::ttt::spez::spez! {
                 for __ttt_param = #toks;
-                match<'a, T: #trait_name> &'a T -> &'a T { 
+                match<'a, T: #trait_name> &'a T -> &'a T {
                     __ttt_param
                 }
                 match<'a, T: ::core::ops::Deref> &'a T where T::Target: #trait_name -> &'a T::Target {
@@ -150,12 +168,15 @@ pub fn auto_deref_for_trait(toks: impl ToTokens, trait_name: impl ToTokens) -> T
     }
 }
 
-pub fn auto_deref_for_type(toks: impl ToTokens, type_name: impl ToTokens) -> TokenStream {
+pub fn auto_deref_for_type(
+    toks: impl ToTokens,
+    type_name: impl ToTokens,
+) -> TokenStream {
     quote_spanned! { toks.span() =>
         {
             ::ttt::spez::spez! {
                 for __ttt_param = #toks;
-                match<'a> &'a #type_name -> &'a #type_name { 
+                match<'a> &'a #type_name -> &'a #type_name {
                     __ttt_param
                 }
                 match<'a, T: ::core::ops::Deref<Target = #type_name>> &'a T -> &'a T::Target {

@@ -109,7 +109,8 @@ fn get_var_variant_impl(variant: &VariantInfo) -> TokenStream {
     }
 }
 
-pub fn derive(ast: synstructure::Structure) -> proc_macro2::TokenStream {
+pub fn derive(mut ast: synstructure::Structure) -> proc_macro2::TokenStream {
+    ast.add_bounds(synstructure::AddBounds::Generics);
     let dbn_impl = map_indices_impl(ast.clone());
     let get_var_impl = get_var_impl(ast.clone());
 
