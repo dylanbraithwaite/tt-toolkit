@@ -68,3 +68,19 @@ where
         Ok(Box::new((**self).substitute(expr, var)?))
     }
 }
+
+impl<T, U> Substitute<U> for std::rc::Rc<T>
+where
+    T: Substitute<U>,
+{
+    type Target = std::rc::Rc<T::Target>;
+    type Error = T::Error;
+
+    fn substitute(
+        &self,
+        expr: &U,
+        var: usize,
+    ) -> Result<Self::Target, Self::Error> {
+        Ok(std::rc::Rc::new((**self).substitute(expr, var)?))
+    }
+}
