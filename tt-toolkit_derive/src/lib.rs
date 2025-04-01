@@ -33,3 +33,6 @@ decl_derive! { [Attributed, attributes(check, check_type, synth, synth_type, bid
     #[proc_macro_error]
     attribute_derives::derive_attributed
 }
+
+mod resolve_vars;
+decl_derive! { [ResolveVars, attributes(var_index, binding, var_name, binding_name)] => resolve_vars::derive }

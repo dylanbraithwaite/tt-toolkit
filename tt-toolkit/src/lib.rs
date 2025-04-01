@@ -38,6 +38,10 @@ pub use attribute::{
 #[doc(inline)]
 pub use ttt_derive::Attributed;
 
+pub mod resolve_vars;
+pub use resolve_vars::*;
+pub use ttt_derive::ResolveVars;
+
 #[doc(hidden)]
 pub use ::spez;
 
