@@ -5,10 +5,23 @@ pub trait SynthAttribute<Attr> {
     type Error;
     type Entry;
     type Ctx: Context<Self::Entry>;
+
     fn synth(&self, ctx: &Self::Ctx) -> Result<Attr, Self::Error>;
 
     fn synth_closed(&self) -> Result<Attr, Self::Error> {
         self.synth(&Context::empty())
+    }
+}
+
+pub trait PartialSynthAttribute<Attr> {
+    type Error;
+    type Entry;
+    type Ctx: Context<Self::Entry>;
+
+    fn try_synth(&self, ctx: &Self::Ctx) -> Result<Option<Attr>, Self::Error>;
+
+    fn try_synth_closed(&self) -> Result<Option<Attr>, Self::Error> {
+        self.try_synth(&Context::empty())
     }
 }
 
@@ -30,7 +43,7 @@ pub trait CheckAttribute<Attr> {
 }
 
 #[diagnostic::do_not_recommend]
-impl<Attr, Expr> SynthAttribute<Option<Attr>> for Expr
+impl<Attr, Expr> PartialSynthAttribute<Attr> for Expr
 where
     Expr: SynthAttribute<Attr>,
 {
@@ -40,22 +53,30 @@ where
 
     type Ctx = Expr::Ctx;
 
-    fn synth(&self, ctx: &Self::Ctx) -> Result<Option<Attr>, Self::Error> {
+    fn try_synth(&self, ctx: &Self::Ctx) -> Result<Option<Attr>, Self::Error> {
         Ok(Some(self.synth(ctx)?))
     }
 }
 
 pub trait BidirAttribute<Attr>:
-    CheckAttribute<Attr>
-    + SynthAttribute<
-        Option<Attr>,
-        Error = <Self as CheckAttribute<Attr>>::Error,
-        Entry = <Self as CheckAttribute<Attr>>::Entry,
-        Ctx = <Self as CheckAttribute<Attr>>::Ctx,
+    CheckAttribute<
+        Attr,
+        Error = <Self as BidirAttribute<Attr>>::Error,
+        Entry = <Self as BidirAttribute<Attr>>::Entry,
+        Ctx = <Self as BidirAttribute<Attr>>::Ctx,
+    > + PartialSynthAttribute<
+        Attr,
+        Error = <Self as BidirAttribute<Attr>>::Error,
+        Entry = <Self as BidirAttribute<Attr>>::Entry,
+        Ctx = <Self as BidirAttribute<Attr>>::Ctx,
     >
 {
+    type Error;
+    type Entry;
+    type Ctx;
 }
 
+#[diagnostic::do_not_recommend]
 impl<Expr, Attr> CheckAttribute<Attr> for Expr
 where
     Expr: SynthAttribute<Attr>,
@@ -77,10 +98,14 @@ where
     }
 }
 
+#[diagnostic::do_not_recommend]
 impl<Expr, Attr> BidirAttribute<Attr> for Expr
 where
     Attr: ContextualEq<Expr::Entry, Expr::Ctx>,
     Expr: SynthAttribute<Attr>,
     Expr::Error: From<Attr::Error>,
 {
+    type Error = Expr::Error;
+    type Entry = Expr::Entry;
+    type Ctx = Expr::Ctx;
 }

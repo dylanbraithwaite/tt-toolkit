@@ -18,7 +18,9 @@ pub use context::{Context, ListContext, PartialContext};
 
 pub mod contextual_eq;
 #[doc(inline)]
-pub use contextual_eq::ContextualEq;
+pub use contextual_eq::{
+    AutoContextualEq, ContextualEq, NormalFormEq, SyntacticEq,
+};
 
 pub mod evaluate;
 #[doc(inline)]
@@ -29,7 +31,9 @@ pub use ttt_derive::Evaluate;
 
 pub mod attribute;
 #[doc(inline)]
-pub use attribute::{BidirAttribute, CheckAttribute, SynthAttribute};
+pub use attribute::{
+    BidirAttribute, CheckAttribute, PartialSynthAttribute, SynthAttribute,
+};
 #[doc = include_str!("../docs/attributed.md")]
 #[doc(inline)]
 pub use ttt_derive::Attributed;
@@ -38,23 +42,21 @@ pub use ttt_derive::Attributed;
 pub use ::spez;
 
 mod never {
-    pub
-    trait FnOnce<Args> {
+    pub trait FnOnce<Args> {
         type Output;
     }
 
     impl<F, R> FnOnce<()> for F
     where
-        F : ::core::ops::FnOnce() -> R,
+        F: ::core::ops::FnOnce() -> R,
     {
         type Output = R;
     }
 
-    pub type Never = <fn()->! as FnOnce<()>>::Output;
+    pub type Never = <fn() -> ! as FnOnce<()>>::Output;
 }
 
 pub use never::Never;
-
 
 #[derive(Clone, PartialEq, Debug)]
 pub struct DefaultError;
@@ -64,4 +66,3 @@ impl From<Never> for DefaultError {
         value
     }
 }
-

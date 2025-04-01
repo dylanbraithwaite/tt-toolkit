@@ -8,7 +8,7 @@ use syn::{
 };
 
 use crate::utils::attributes::HasAttributes;
-use crate::utils::{auto_deref_for_trait, auto_deref_for_type};
+use crate::utils::{auto_deref, auto_deref_for_trait, auto_deref_for_type};
 
 const WHILE_EXPR_MARKER_ATTR: &str = "ttt_while_is_bind";
 
@@ -72,26 +72,63 @@ impl DslParams {
         }
     }
 
-    fn expand_synth_expr(&self, synth_call: syn::ExprCall) -> Expr {
+    fn expand_try_synth_expr(&self, synth_call: syn::ExprCall) -> Expr {
         let ctx_name = context_name();
         let span = synth_call.span();
-        let attr_type = &self.attr_type;
-        let synth_trait = &quote!(::ttt::SynthAttribute<#attr_type>);
         match synth_call.args.len() {
             1 => {
                 // By default use type of current instantiation
                 // I'd like to use inference here, but the current (old) trait solver consistently chokes at this
-                let arg = auto_deref_for_trait(&synth_call.args, synth_trait);
+                let attr_type = &self.attr_type;
+                let synth_trait_expr =
+                    quote!(::ttt::PartialSynthAttribute::<#attr_type>);
+                let arg = auto_deref(&synth_call.args);
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::<#attr_type>::synth(#arg, #ctx_name)?
+                    #synth_trait_expr::try_synth(#arg, #ctx_name)?
                 }
             }
             // Allow specifying attribute type as parameter in synth call
             2 => {
-                let attr_ty = synth_call.args.first().unwrap();
-                let expr = auto_deref_for_trait(synth_call.args.last().unwrap(), synth_trait);
+                let attr_type = synth_call.args.first().unwrap();
+                let synth_trait_expr =
+                    quote!(::ttt::PartialSynthAttribute::<#attr_type>);
+                let expr = auto_deref(synth_call.args.last());
+
                 parse_quote_spanned! { span =>
-                    ::ttt::SynthAttribute::<#attr_ty>::synth(#expr, #ctx_name)?
+                    #synth_trait_expr::try_synth(#expr, #ctx_name)?
+                }
+            }
+            _ => abort!(
+                span,
+                "`synth` call should have no more than 2 parameters"
+            ),
+        }
+    }
+
+    fn expand_synth_expr(&self, synth_call: syn::ExprCall) -> Expr {
+        let ctx_name = context_name();
+        let span = synth_call.span();
+        // let synth_trait = &quote!(::ttt::SynthAttribute<#attr_type>);
+        match synth_call.args.len() {
+            1 => {
+                // By default use type of current instantiation
+                // I'd like to use inference here, but the current (old) trait solver consistently chokes at this
+                let attr_type = &self.attr_type;
+                let synth_trait_expr =
+                    quote!(::ttt::SynthAttribute::<#attr_type>);
+                let arg = auto_deref(&synth_call.args);
+                parse_quote_spanned! { span =>
+                    #synth_trait_expr::synth(#arg, #ctx_name)?
+                }
+            }
+            // Allow specifying attribute type as parameter in synth call
+            2 => {
+                let attr_type = synth_call.args.first().unwrap();
+                let synth_trait_expr =
+                    quote!(::ttt::SynthAttribute::<#attr_type>);
+                let expr = auto_deref(synth_call.args.last());
+                parse_quote_spanned! { span =>
+                    #synth_trait_expr::synth(#expr, #ctx_name)?
                 }
             }
             _ => abort!(
@@ -105,12 +142,15 @@ impl DslParams {
         let ctx_name = context_name();
         let attr_ty = &self.attr_type;
         let span = check_call.span();
-        let check_trait = quote!(::ttt::CheckAttribute<#attr_ty>);
+        // let check_trait = quote!(::ttt::CheckAttribute<#attr_ty>);
         match check_call.args.len() {
             2 => {
                 let mut args = check_call.args.into_iter();
-                let arg1 = auto_deref_for_trait(args.next().unwrap(), check_trait);
-                let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
+                let arg1 = auto_deref(args.next().unwrap());
+                let arg2 = auto_deref(args.next().unwrap());
+                // let arg1 =
+                //     auto_deref_for_trait(args.next().unwrap(), check_trait);
+                // let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
                 // TODO: I'd like to not have to specify attr_ty here, so that
                 // check(..) calls can check other attribute types too, but
                 // the compiler fails to infer this, I think due to
@@ -122,8 +162,11 @@ impl DslParams {
             3 => {
                 let mut args = check_call.args.into_iter();
                 let attr_ty = &args.next().unwrap();
-                let arg1 = auto_deref_for_trait(args.next().unwrap(), check_trait);
-                let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
+                let arg1 = auto_deref(args.next().unwrap());
+                let arg2 = auto_deref(args.next().unwrap());
+                // let arg1 =
+                //     auto_deref_for_trait(args.next().unwrap(), check_trait);
+                // let arg2 = auto_deref_for_type(args.next().unwrap(), attr_ty);
                 // TODO: I'd like to not have to specify attr_ty here, so that
                 // check(..) calls can check other attribute types too, but
                 // the compiler fails to infer this, I think due to
@@ -218,6 +261,7 @@ impl syn::fold::Fold for DslParams {
             }
             Expr::Call(call_expr) => expand_calls! { call_expr.func.as_ref();
                 synth => self.expand_synth_expr(call_expr),
+                try_synth => self.expand_try_synth_expr(call_expr),
                 check => self.expand_check_expr(call_expr),
                 lookup => self.expand_lookup_expr(call_expr),
                 _ => Expr::Call(call_expr),
@@ -300,11 +344,12 @@ pub fn instantiate_dsl(
 ) -> TokenStream {
     let body = unwrap_parsed!(
         Block::parse_within.parse2(replace_bind_tokens(body.to_token_stream()))
-    ); 
+    );
     DslParams {
         context_type: context_type.clone(),
         context: context.clone(),
         attr_type: attr_type.clone(),
         entry_type: entry_type.clone(),
-    }.expand_body(body)
+    }
+    .expand_body(body)
 }

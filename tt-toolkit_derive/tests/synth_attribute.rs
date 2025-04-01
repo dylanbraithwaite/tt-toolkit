@@ -1,4 +1,7 @@
-use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute, Attributed};
+use ttt::{
+    Attributed, Context, SynthAttribute,
+    contextual_eq::{AutoContextualEq, SyntacticEq},
+};
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {
@@ -7,8 +10,9 @@ enum Ty {
     Unit,
 }
 
-impl SyntacticEq for Ty {}
-
+impl<E, C: Context<E>> AutoContextualEq<E, C> for Ty {
+    type Impl = SyntacticEq<Ty>;
+}
 
 #[derive(Clone, Attributed)]
 #[synth_type(Ty)]
@@ -40,7 +44,10 @@ fn check_lambda() {
     let expr = Lam(Ty::Unit.into(), Unit.into());
     let ty = Ty::Func(Ty::Unit.into(), Ty::Unit.into());
 
-    assert_eq!(SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(), ty)
+    assert_eq!(
+        SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(),
+        ty
+    )
 }
 
 #[test]
@@ -53,12 +60,18 @@ fn check_pair() {
         use Ty::*;
         Prod(Unit.into(), Unit.into())
     };
-    assert_eq!(SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(), ty)
+    assert_eq!(
+        SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(),
+        ty
+    )
 }
 
 #[test]
 fn check_lambda_app() {
     use Expr::*;
     let expr = App(Lam(Ty::Unit.into(), Unit.into()).into(), Unit.into());
-    assert_eq!(SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(), Ty::Unit)
+    assert_eq!(
+        SynthAttribute::<Ty>::synth(&expr, &Context::empty()).unwrap(),
+        Ty::Unit
+    )
 }

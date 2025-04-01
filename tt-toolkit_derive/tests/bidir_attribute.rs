@@ -1,4 +1,7 @@
-use ttt::{contextual_eq::SyntacticEq, Context, SynthAttribute, CheckAttribute, Attributed};
+use ttt::{
+    Attributed, CheckAttribute, Context, PartialSynthAttribute,
+    contextual_eq::{AutoContextualEq, SyntacticEq},
+};
 
 #[derive(Clone, PartialEq, Debug)]
 enum Ty {
@@ -7,8 +10,9 @@ enum Ty {
     Unit,
 }
 
-impl SyntacticEq for Ty {}
-
+impl<E, C: Context<E>> AutoContextualEq<E, C> for Ty {
+    type Impl = SyntacticEq<Ty>;
+}
 
 #[derive(Clone, Attributed)]
 #[bidir_type(Ty)]
@@ -22,14 +26,14 @@ enum Expr {
     Lam(Box<Expr>),
 
     #[synth(Ty; (Expr::Lam(body), arg) =>
-        let Some(src): Option<Ty> = synth(arg);
-        bind src { synth(body) }
+        let Some(src): Option<Ty> = try_synth(arg);
+        bind src { try_synth(body) }
     )]
     App(Box<Expr>, Box<Expr>),
 
     #[synth(Ty; (left, right) =>
-        let Some(left_ty) = synth(left);
-        let Some(right_ty) = synth(right);
+        let Some(left_ty) = try_synth(left);
+        let Some(right_ty) = try_synth(right);
         Ty::Prod(left_ty.into(), right_ty.into())
     )]
     Pair(Box<Expr>, Box<Expr>),
@@ -54,12 +58,12 @@ fn check_pair() {
         use Ty::*;
         Prod(Unit.into(), Unit.into())
     };
-    assert_eq!(SynthAttribute::<Option<Ty>>::synth(&expr, &Context::empty()).unwrap(), Some(ty))
+    assert_eq!(expr.try_synth_closed().unwrap(), Some(ty))
 }
 
 #[test]
 fn check_lambda_app() {
     use Expr::*;
     let expr = App(Lam(Unit.into()).into(), Unit.into());
-    assert_eq!(SynthAttribute::<Option<Ty>>::synth(&expr, &Context::empty()).unwrap(), Some(Ty::Unit))
+    assert_eq!(expr.try_synth_closed().unwrap(), Some(Ty::Unit))
 }

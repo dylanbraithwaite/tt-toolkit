@@ -6,6 +6,8 @@ use crate::{Context, PartialContext, SubstError};
 pub enum EvalError {
     #[error(transparent)]
     SubstError(#[from] SubstError),
+    #[error("Unbound variable index {}", 0)]
+    UnboundVariableIndex(usize),
 }
 
 pub trait Evaluate: Clone {
@@ -76,4 +78,3 @@ impl<T: Evaluate> Evaluate for std::rc::Rc<T> {
         (**self).evaluate(ctx, under_binders)
     }
 }
-
